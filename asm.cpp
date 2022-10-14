@@ -5,21 +5,23 @@
 
 
 /*-----------COMMANDS CPU-----------*/
+		
 
-#define ADD  "add"					
-#define DIV  "div"
-#define DUMP "dump"					
-#define HLT  "hlt"
-#define IN   "in"
-#define JMP  "jmp"
-#define MUL  "mul"
-#define OUT  "out"
-#define PUSH "push"
-#define SUB  "sub"
+#define PUSH "push"     // ---> 1
+#define ADD  "add"      // ---> 2
+#define SUB  "sub"      // ---> 3
+#define MUL  "mul"      // ---> 4
+#define DIV  "div"      // ---> 5
+#define IN   "in"       // ---> 6
+#define JMP  "jmp"      // ---> 7
+#define DUMP "dump"     // ---> 8
+#define OUT  "out"      // ---> 9
+#define HLT  "hlt"      // ---> 10
+
 
 /*----------------------------------*/
 
-#define MAXLENCOMMAND 20
+#define MAXLENCOMMAND 50
 
 
 #define CHECK_ERROR(condition, message_error, error_code) \
@@ -44,19 +46,20 @@ enum error_memory {
 };
 
 
-unsigned int amountOfString (FILE * compFile, unsigned long long filesize);
-void ASM (unsigned long amount_of_strings, char ** getAdress, FILE * aftercompFile);
+unsigned int amountOfString (char * mem, unsigned long filesize);
+void converter (int * commandsArray, char ** getAdress, FILE * aftercompFile, unsigned long amount_of_strings);  
+bool createCommandsArray (int ** bufferNumberCommands, unsigned long amount_of_strings);
 unsigned long FileSize (FILE * file);
+void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * getAdress);
 unsigned int getBuffer (char ** mem_start, unsigned long filesize,\
                             unsigned long * amount_of_string, FILE * file);
 unsigned int InitializePointersArray (char *** getAdress, char * mem_start, unsigned long filesize,\
                               unsigned long amount_of_string);
 void pointerGetStr (char * buffer, char ** getAdress, unsigned long filesize);
 void recordInBuffer (char * mem_start);
-
+unsigned int skipSpaces (char * commandStr);
 
 int main (void) {
-
 
 	FILE * compFile = fopen ("compileFile.txt", "r");
 	CHECK_ERROR (compFile == NULL, "Problem with opening compileFile.txt", FILE_AREN_T_OPENING);
@@ -64,12 +67,30 @@ int main (void) {
 	CHECK_ERROR (aftercompFile == NULL, "Problem with opening afterCompileFile.txt", FILE_AREN_T_OPENING);
 	unsigned long filesize = FileSize (compFile), amount_of_strings = 0;
 	CHECK_ERROR (filesize == 0, "The compilefile is empty.", EMPTY_FILE);
-	char * mem_start = NULL, ** getAdress = NULL, ** command = NULL;;
-    MAIN_DET (getBuffer (&mem_start, filesize, &amount_of_strings, compFile));
-    MAIN_DET (InitializePointersArray (&getAdress, mem_start, filesize, amount_of_strings));
-    ASM (amount_of_strings, getAdress, aftercompFile);
-    
 
+	char * mem_start     = NULL, 
+         ** getAdress    = NULL;
+    int  * commandsArray = NULL;
+    CHECK_ERROR (createCommandsArray (&commandsArray, amount_of_strings) == false, "Problem with allocating memory.", MEMORY_NOT_FOUND);
+    MAIN_DET (getBuffer (&mem_start, filesize, &amount_of_strings, compFile));
+    InitializePointersArray (&getAdress, mem_start, filesize, amount_of_strings);
+    pointerGetStr (mem_start, getAdress, filesize);
+    converter (commandsArray, getAdress, aftercompFile, amount_of_strings);
+
+    for (int i = 0; i < amount_of_strings * 2; i++)
+        printf ("%d ", commandsArray [i]);
+    
+    return 0;
+}
+
+
+bool createCommandsArray (int ** bufferNumberCommands, unsigned long amount_of_strings) {
+
+    * bufferNumberCommands = (int * ) calloc (2 * amount_of_strings, sizeof (int));
+    
+    if (bufferNumberCommands == NULL)
+        return false;
+    return true;
 }
 
 
@@ -84,33 +105,20 @@ unsigned int amountOfString (char * mem, unsigned long filesize) {
 }
 
 
-void ASM (unsigned long amount_of_strings, char ** getAdress, FILE * aftercompFile) {
+void converter (int * commandsArray, char ** getAdress, FILE * aftercompFile, unsigned long amount_of_strings) {
 
-	char cmd [MAXLENCOMMAND] = " ";
-	int val = 0;
+    char capacityBuffer [MAXLENCOMMAND];
+    int i = 0, val = 0, j = 0;
 
-	int i = 0;
-	for (i = 0; i < amount_of_strings; i++) {
+    for (i = 0; i < amount_of_strings; i++) {
 
-		sscanf (getAdress [i], "%s", cmd);
-		//sscanf (getAdress [i] + 4, "%d", val);
-		printf ("%s\n", cmd);
-		// printf ("%d", val);
-	}
-	
-}
+        sscanf (getAdress [i], "%s", capacityBuffer);
+        getAssemblerCommands (capacityBuffer, commandsArray, getAdress [i]);
+    }
 
-/*
-void converter (char * cmd) {
-
-	int val = 0;
-
-	if (!stricmp (cmd, PUSH))
-		sscanf (, "%d", &val)
 
 }
 
-*/
 
 unsigned long FileSize (FILE * compfile) {
 
@@ -123,15 +131,80 @@ unsigned long FileSize (FILE * compfile) {
 
 
 unsigned int getBuffer (char ** mem_start, unsigned long filesize,\
-                            unsigned long * amount_of_strings, FILE * file) {
+                            unsigned long * amount_of_string, FILE * file) {
 
     * mem_start = (char * ) calloc (filesize, sizeof (char));
     CHECK_ERROR (* mem_start == NULL, "Memory not allocated for mem_start.", MEMORY_NOT_FOUND);
     fread (* mem_start, sizeof (char), filesize, file);
     recordInBuffer (* mem_start);
-    * amount_of_strings = amountOfString (* mem_start, filesize);
+    * amount_of_string = amountOfString (* mem_start, filesize);
 
     return NO_ERROR;
+}
+
+
+void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * getAdress) {
+
+    int val = 0;
+    static int j = 0;
+
+    if (!strcmp (PUSH, capacityBuffer)   ) {
+
+        commandsArray [j] =   1;     j++;
+        val =     skipSpaces (getAdress);
+        commandsArray [j] = val;     j++;
+    }
+
+    if (!strcmp (ADD, capacityBuffer)    ) {
+
+        commandsArray [j] =   2;     j++;
+    }
+
+    if (!strcmp (SUB, capacityBuffer)    ) {
+
+        commandsArray [j] =   3;     j++;
+    }
+
+    if (!strcmp (MUL, capacityBuffer)    ) {
+
+        commandsArray [j] =   4;     j++;
+    }
+
+    if (!strcmp (DIV, capacityBuffer)    ) {
+
+        commandsArray [j] =   5;     j++;
+    }
+
+    if (!strcmp (IN, capacityBuffer)     ) {
+
+        commandsArray [j] =   6;     j++;
+
+        if (scanf ("%d", &val) == 0)
+            exit (EXIT_FAILURE);
+        commandsArray [j] = val;     j++;  
+    }
+
+    if (!strcmp (JMP, capacityBuffer)    ) {
+
+        commandsArray [j] =   7;     j++;
+        val =     skipSpaces (getAdress);
+        commandsArray [j] = val;     j++;
+    }
+
+    if (!strcmp (DUMP, capacityBuffer)   ) {
+
+        commandsArray [j] =   8;     j++;
+    }
+
+    if (!strcmp (OUT, capacityBuffer)    ) {
+
+        commandsArray [j] =   9;     j++;
+    }
+
+    if (!strcmp (HLT, capacityBuffer)    ) {
+
+        commandsArray [j] =  10;     j++;
+    }
 }
 
 
@@ -158,6 +231,16 @@ void pointerGetStr (char * buffer, char ** getAdress, unsigned long filesize) {
             j++;
         }
     }
+}
+
+
+unsigned int skipSpaces (char * getAdress) {
+
+    int val = 0, indexNumber = 0;
+    while (sscanf (getAdress + indexNumber, "%d", &val) != 1)
+        indexNumber++;
+
+    return val;
 }
 
 
