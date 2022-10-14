@@ -47,7 +47,7 @@ enum error_memory {
 
 
 unsigned int amountOfString (char * mem, unsigned long filesize);
-void converter (int * commandsArray, char ** getAdress, FILE * aftercompFile, unsigned long amount_of_strings);  
+void converter (int * commandsArray, char ** getAdress, unsigned long amount_of_strings);  
 bool createCommandsArray (int ** bufferNumberCommands, unsigned long amount_of_strings);
 unsigned long FileSize (FILE * file);
 void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * getAdress);
@@ -75,7 +75,7 @@ int main (void) {
     MAIN_DET (getBuffer (&mem_start, filesize, &amount_of_strings, compFile));
     InitializePointersArray (&getAdress, mem_start, filesize, amount_of_strings);
     pointerGetStr (mem_start, getAdress, filesize);
-    converter (commandsArray, getAdress, aftercompFile, amount_of_strings);
+    converter (commandsArray, getAdress, amount_of_strings);
 
     for (int i = 0; i < amount_of_strings * 2; i++)
         printf ("%d ", commandsArray [i]);
@@ -105,7 +105,7 @@ unsigned int amountOfString (char * mem, unsigned long filesize) {
 }
 
 
-void converter (int * commandsArray, char ** getAdress, FILE * aftercompFile, unsigned long amount_of_strings) {
+void converter (int * commandsArray, char ** getAdress, unsigned long amount_of_strings) {
 
     char capacityBuffer [MAXLENCOMMAND];
     int i = 0, val = 0, j = 0;
