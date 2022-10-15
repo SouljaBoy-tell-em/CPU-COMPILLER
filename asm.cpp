@@ -6,7 +6,6 @@
 
 #define MAXLENCOMMAND 50
 #define AMOUNTLABELS 30
-#define MAXNAMELABEL 30
 
 
 #define CHECK_ERROR(condition, message_error, error_code) \
@@ -51,17 +50,26 @@ enum error_memory {
 
 typedef struct {
 
-    char name [AMOUNTLABELS][MAXNAMELABEL];
-    int size;
+    char name [MAXLENCOMMAND];
+    int numberStringLabel;
+
+} Node;
+
+
+typedef struct {
+
+    Node arrayLabels [AMOUNTLABELS];
+    int ip;
 
 } Label;
 
 
 unsigned int amountOfString (char * mem, unsigned long filesize);
 void converter (int * commandsArray, char ** getAdress, unsigned long amount_of_strings, Label * labels);
-bool createCommandsArray (int ** bufferNumberCommands, unsigned long amount_of_strings);
+bool createCommandsArray (int ** bufferNumberCommands, unsigned long amount_of_strings, Label ** labels);
+int detect2ndLabel (char * getAdress, Label * labels);
 unsigned long FileSize (FILE * file);
-void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * getAdress, Label * labels);
+void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * getAdress, Label * labels, int numString);
 unsigned int getBuffer (char ** mem_start, unsigned long filesize,\
                             unsigned long * amount_of_string, FILE * file);
 unsigned int InitializePointersArray (char *** getAdress, char * mem_start, unsigned long filesize,\
@@ -80,31 +88,38 @@ int main (void) {
     CHECK_ERROR (filesize == 0, "The compilefile is empty.", EMPTY_FILE);
 
 
-    char  * mem_start     = NULL, 
-          ** getAdress    = NULL;
-    int   * commandsArray = NULL;
-    Label labels          =   {.size = 0};
+    char  *  mem_start     = NULL, 
+          ** getAdress     = NULL;
+    int   *  commandsArray = NULL;
+    Label *  labels        = NULL;
 
 
-    CHECK_ERROR (createCommandsArray (&commandsArray, amount_of_strings) == false, "Problem with allocating memory.", MEMORY_NOT_FOUND);
+    CHECK_ERROR (createCommandsArray (&commandsArray, amount_of_strings, &labels) == false, "Problem with allocating memory.", MEMORY_NOT_FOUND);
     MAIN_DET (getBuffer (&mem_start, filesize, &amount_of_strings, compFile));
     InitializePointersArray (&getAdress, mem_start, filesize, amount_of_strings);
     pointerGetStr (mem_start, getAdress, filesize);
-    converter (commandsArray, getAdress, amount_of_strings, &labels);
+    converter (commandsArray, getAdress, amount_of_strings, labels);
 
-    //for (int i = 0; i < amount_of_strings * 2; i++)
-    //   printf ("%d ", commandsArray [i]);
+    for (int i = 0; i < amount_of_strings * 2; i++)
+       printf ("%d ", commandsArray [i]);
+
+   printf ("\n\n");
     
-    for (int i = 0; i < AMOUNTLABELS; i++)
-        printf ("%s", labels.name [i]);
+    for (int i = 0; i < AMOUNTLABELS; i++) {
+
+        printf ("%s ", (labels->arrayLabels)[i].name);
+        printf ("NUM STRING: %d\n", (labels->arrayLabels)[i].numberStringLabel);
+    }
 
     return 0;
 }
 
 
-bool createCommandsArray (int ** bufferNumberCommands, unsigned long amount_of_strings) {
+bool createCommandsArray (int ** bufferNumberCommands, unsigned long amount_of_strings, Label ** labels) {
 
     * bufferNumberCommands = (int * ) calloc (2 * amount_of_strings, sizeof (int));
+    * labels = (Label * ) calloc (1, sizeof (Label));
+    ( * labels)->ip = 0;
     
     if (bufferNumberCommands == NULL)
         return false;
@@ -116,7 +131,7 @@ unsigned int amountOfString (char * mem, unsigned long filesize) {
 
     unsigned long indexFile = 0, amount = 0;
     for (indexFile = 0; indexFile < filesize; indexFile++)
-        if (*(mem + indexFile) == '\0')
+        if ( * (mem + indexFile) == '\0')
             amount++;
 
     return amount + 1;
@@ -126,15 +141,28 @@ unsigned int amountOfString (char * mem, unsigned long filesize) {
 void converter (int * commandsArray, char ** getAdress, unsigned long amount_of_strings, Label * labels) {
 
     char capacityBuffer [MAXLENCOMMAND];
-    int i = 0, val = 0, j = 0;
+    int numString = 0, val = 0, j = 0;
 
-    for (i = 0; i < amount_of_strings; i++) {
+    for (numString = 0; numString < amount_of_strings; numString++) {
 
-        sscanf (getAdress [i], "%s", capacityBuffer);
-        getAssemblerCommands (capacityBuffer, commandsArray, getAdress [i], labels);
+        sscanf (getAdress [numString], "%s", capacityBuffer);
+        getAssemblerCommands (capacityBuffer, commandsArray, getAdress [numString], labels, numString);
     }
+}
 
 
+int detect2ndLabel (char * getAdress, Label * labels) {
+
+    int startLabel = (int) (strchr (getAdress, ':') - getAdress);
+    char capacityBuffer [MAXLENCOMMAND];
+    strcpy (capacityBuffer, getAdress + startLabel + 1);
+    
+    int i = 0;
+    for (i = 0; i < labels->ip; i++)
+        if (strcmp (capacityBuffer, (labels->arrayLabels)[i].name) == 0)
+            return (labels->arrayLabels)[i].numberStringLabel;
+
+    return -1;
 }
 
 
@@ -161,14 +189,15 @@ unsigned int getBuffer (char ** mem_start, unsigned long filesize,\
 }
 
 
-void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * getAdress, Label * labels) {
+void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * getAdress, Label * labels, int numString) {
 
     int lenNameLabel = strlen (capacityBuffer);
 
     if (capacityBuffer [lenNameLabel - 1] == ':') {
 
-        strncpy (labels->name[labels->size], capacityBuffer, lenNameLabel - 1);
-        labels->size++;
+        strncpy ((labels->arrayLabels[labels->ip]).name, capacityBuffer, lenNameLabel - 1);
+        labels->arrayLabels[labels->ip].numberStringLabel = numString;
+        labels->ip++;
         return;
     }
 
@@ -215,7 +244,7 @@ void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * ge
     if (!strcmp ("jmp", capacityBuffer)    ) {
 
         commandsArray [j] =   JMP;     j++;
-        val =       skipSpaces (getAdress);
+        val = detect2ndLabel (getAdress, labels);
         commandsArray [j] = val;       j++;
     }
 
