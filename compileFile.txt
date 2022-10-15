@@ -1,0 +1,13 @@
+push 10
+push     12
+lol:
+push 20
+in
+jmp :lol
+in
+push 1
+push 2
+david:
+out
+jmp :david
+hlt
