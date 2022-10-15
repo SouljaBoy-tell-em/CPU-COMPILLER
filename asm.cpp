@@ -196,6 +196,19 @@ void decompilationCommand (int command, FILE * fileDecompilation, bool * flagDua
     }
 
     //-------------------------------------------//
+
+    else {
+
+        fprintf (fileDecompilation, "%d\n", command);
+        * flagDualCommands = false;
+        return;
+    }
+
+    if (command == PUSH) {
+
+        fprintf (fileDecompilation, "push ");
+        * flagDualCommands = true;
+    }
 }
 
 
