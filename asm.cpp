@@ -52,7 +52,6 @@ typedef struct {
 
     char name [MAXLENCOMMAND];
     int numberStringLabel;
-
 } Node;
 
 
@@ -60,13 +59,14 @@ typedef struct {
 
     Node arrayLabels [AMOUNTLABELS];
     int ip;
-
 } Label;
 
 
 unsigned int amountOfString (char * mem, unsigned long filesize);
 void converter (int * commandsArray, char ** getAdress, unsigned long amount_of_strings, Label * labels);
 bool createCommandsArray (int ** bufferNumberCommands, unsigned long amount_of_strings, Label ** labels);
+void decompilation (int * commandsArray, Label * labels, FILE * fileDecompilation, unsigned long sizeCommandsArray);
+void decompilationCommand (int command, FILE * fileDecompilation, bool * flagDualCommands);
 int detect2ndLabel (char * getAdress, Label * labels);
 unsigned long FileSize (FILE * file);
 void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * getAdress, Label * labels, int numString);
@@ -82,8 +82,8 @@ int main (void) {
 
     FILE * compFile = fopen ("compileFile.txt", "r");
     CHECK_ERROR (compFile == NULL, "Problem with opening compileFile.txt", FILE_AREN_T_OPENING);
-    FILE * aftercompFile = fopen ("afterCompileFile.txt", "w");
-    CHECK_ERROR (aftercompFile == NULL, "Problem with opening afterCompileFile.txt", FILE_AREN_T_OPENING);
+    FILE * fileDecompilation = fopen ("afterCompileFile.txt", "w");
+    CHECK_ERROR (fileDecompilation == NULL, "Problem with opening afterCompileFile.txt", FILE_AREN_T_OPENING);
     unsigned long filesize = FileSize (compFile), amount_of_strings = 0;
     CHECK_ERROR (filesize == 0, "The compilefile is empty.", EMPTY_FILE);
 
@@ -100,8 +100,11 @@ int main (void) {
     pointerGetStr (mem_start, getAdress, filesize);
     converter (commandsArray, getAdress, amount_of_strings, labels);
 
+
     for (int i = 0; i < amount_of_strings * 2; i++)
        printf ("%d ", commandsArray [i]);
+
+   /*
 
    printf ("\n\n");
     
@@ -111,7 +114,22 @@ int main (void) {
         printf ("NUM STRING: %d\n", (labels->arrayLabels)[i].numberStringLabel);
     }
 
+*/
+
+    decompilation (commandsArray, labels, fileDecompilation, 2 * amount_of_strings);
+
     return 0;
+}
+
+
+unsigned int amountOfString (char * mem, unsigned long filesize) {
+
+    unsigned long indexFile = 0, amount = 0;
+    for (indexFile = 0; indexFile < filesize; indexFile++)
+        if ( * (mem + indexFile) == '\0')
+            amount++;
+
+    return amount + 1;
 }
 
 
@@ -127,17 +145,6 @@ bool createCommandsArray (int ** bufferNumberCommands, unsigned long amount_of_s
 }
 
 
-unsigned int amountOfString (char * mem, unsigned long filesize) {
-
-    unsigned long indexFile = 0, amount = 0;
-    for (indexFile = 0; indexFile < filesize; indexFile++)
-        if ( * (mem + indexFile) == '\0')
-            amount++;
-
-    return amount + 1;
-}
-
-
 void converter (int * commandsArray, char ** getAdress, unsigned long amount_of_strings, Label * labels) {
 
     char capacityBuffer [MAXLENCOMMAND];
@@ -148,6 +155,47 @@ void converter (int * commandsArray, char ** getAdress, unsigned long amount_of_
         sscanf (getAdress [numString], "%s", capacityBuffer);
         getAssemblerCommands (capacityBuffer, commandsArray, getAdress [numString], labels, numString);
     }
+}
+
+
+void decompilation (int * commandsArray, Label * labels, FILE * fileDecompilation, unsigned long sizeCommandsArray) {
+
+    bool flagDualCommands = false;
+    int i = 0;
+    for (i = 0; i < sizeCommandsArray; i++)
+        decompilationCommand (commandsArray [i], fileDecompilation, &flagDualCommands);
+}
+
+
+void decompilationCommand (int command, FILE * fileDecompilation, bool * flagDualCommands) {
+
+    //--------------SIMPLE COMMANDS--------------//
+
+    if ( * flagDualCommands == false) {
+
+        if (command == ADD)
+            fprintf (fileDecompilation, "add\n" );
+
+        if (command == SUB)
+            fprintf (fileDecompilation, "sub\n" );
+
+        if (command == MUL)
+            fprintf (fileDecompilation, "mul\n" );
+
+        if (command == DIV)
+            fprintf (fileDecompilation, "div\n" );
+
+        if (command == DUMP)
+            fprintf (fileDecompilation, "dump\n");
+
+        if (command == OUT)
+            fprintf (fileDecompilation, "out\n" );
+
+        if (command == HLT)
+            fprintf (fileDecompilation, "hlt\n" );
+    }
+
+    //-------------------------------------------//
 }
 
 
