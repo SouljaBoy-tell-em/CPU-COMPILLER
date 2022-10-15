@@ -7,21 +7,11 @@
 /*-----------COMMANDS CPU-----------*/
 		
 
-#define PUSH "push"     // ---> 1
-#define ADD  "add"      // ---> 2
-#define SUB  "sub"      // ---> 3
-#define MUL  "mul"      // ---> 4
-#define DIV  "div"      // ---> 5
-#define IN   "in"       // ---> 6
-#define JMP  "jmp"      // ---> 7
-#define DUMP "dump"     // ---> 8
-#define OUT  "out"      // ---> 9
-#define HLT  "hlt"      // ---> 10
-
 
 /*----------------------------------*/
 
 #define MAXLENCOMMAND 50
+#define AMOUNTLABELS 30
 
 
 #define CHECK_ERROR(condition, message_error, error_code) \
@@ -36,6 +26,20 @@
                             exit (EXIT_FAILURE);          \
                             }
 
+
+enum commands {
+
+    PUSH = 1,
+    ADD,
+    SUB,
+    MUL,
+    DIV,
+    IN,
+    JMP,
+    DUMP,
+    OUT,
+    HLT
+};
 
 enum error_memory {
 
@@ -71,6 +75,7 @@ int main (void) {
 	char * mem_start     = NULL, 
          ** getAdress    = NULL;
     int  * commandsArray = NULL;
+
     CHECK_ERROR (createCommandsArray (&commandsArray, amount_of_strings) == false, "Problem with allocating memory.", MEMORY_NOT_FOUND);
     MAIN_DET (getBuffer (&mem_start, filesize, &amount_of_strings, compFile));
     InitializePointersArray (&getAdress, mem_start, filesize, amount_of_strings);
@@ -145,66 +150,74 @@ unsigned int getBuffer (char ** mem_start, unsigned long filesize,\
 
 void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * getAdress) {
 
+    if (capacityBuffer [strlen (capacityBuffer) - 1] == ':') {
+
+
+        return;
+    }
+
     int val = 0;
     static int j = 0;
 
-    if (!strcmp (PUSH, capacityBuffer)   ) {
+    if (!strcmp ("push", capacityBuffer)   ) {
 
-        commandsArray [j] =   1;     j++;
-        val =     skipSpaces (getAdress);
-        commandsArray [j] = val;     j++;
+        commandsArray [j] =   PUSH;    j++;
+        val =       skipSpaces (getAdress);
+        commandsArray [j] = val;       j++;
     }
 
-    if (!strcmp (ADD, capacityBuffer)    ) {
+    if (!strcmp ("add", capacityBuffer)    ) {
 
-        commandsArray [j] =   2;     j++;
+        commandsArray [j] =   ADD;     j++;
     }
 
-    if (!strcmp (SUB, capacityBuffer)    ) {
+    if (!strcmp ("sub", capacityBuffer)    ) {
 
-        commandsArray [j] =   3;     j++;
+        commandsArray [j] =   SUB;     j++;
     }
 
-    if (!strcmp (MUL, capacityBuffer)    ) {
+    if (!strcmp ("mul", capacityBuffer)    ) {
 
-        commandsArray [j] =   4;     j++;
+        commandsArray [j] =   MUL;     j++;
     }
 
-    if (!strcmp (DIV, capacityBuffer)    ) {
+    if (!strcmp ("div", capacityBuffer)    ) {
 
-        commandsArray [j] =   5;     j++;
+        commandsArray [j] =   DIV;     j++;
     }
 
-    if (!strcmp (IN, capacityBuffer)     ) {
+    if (!strcmp ("in", capacityBuffer)     ) {
 
-        commandsArray [j] =   6;     j++;
+        commandsArray [j] =   IN;      j++;
 
         if (scanf ("%d", &val) == 0)
             exit (EXIT_FAILURE);
-        commandsArray [j] = val;     j++;  
+
+        commandsArray [j] = val;       j++;  
     }
 
-    if (!strcmp (JMP, capacityBuffer)    ) {
+    if (!strcmp ("jmp", capacityBuffer)    ) {
 
-        commandsArray [j] =   7;     j++;
-        val =     skipSpaces (getAdress);
-        commandsArray [j] = val;     j++;
+        commandsArray [j] =   JMP;     j++;
+        val =       skipSpaces (getAdress);
+        commandsArray [j] = val;       j++;
     }
 
-    if (!strcmp (DUMP, capacityBuffer)   ) {
+    if (!strcmp ("dump", capacityBuffer)   ) {
 
-        commandsArray [j] =   8;     j++;
+        commandsArray [j] =   DUMP;    j++;
     }
 
-    if (!strcmp (OUT, capacityBuffer)    ) {
+    if (!strcmp ("out", capacityBuffer)    ) {
 
-        commandsArray [j] =   9;     j++;
+        commandsArray [j] =   OUT;     j++;
     }
 
-    if (!strcmp (HLT, capacityBuffer)    ) {
+    if (!strcmp ("hlt", capacityBuffer)    ) {
 
-        commandsArray [j] =  10;     j++;
+        commandsArray [j] =  HLT;      j++;
     }
+
 }
 
 
