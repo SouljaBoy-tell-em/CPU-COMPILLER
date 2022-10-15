@@ -4,14 +4,9 @@
 #include <sys/stat.h>
 
 
-/*-----------COMMANDS CPU-----------*/
-		
-
-
-/*----------------------------------*/
-
 #define MAXLENCOMMAND 50
 #define AMOUNTLABELS 30
+#define MAXNAMELABEL 30
 
 
 #define CHECK_ERROR(condition, message_error, error_code) \
@@ -27,6 +22,8 @@
                             }
 
 
+/*-----------COMMANDS CPU-----------*/
+
 enum commands {
 
     PUSH = 1,
@@ -41,6 +38,8 @@ enum commands {
     HLT
 };
 
+/*----------------------------------*/
+
 enum error_memory {
 
     NO_ERROR,
@@ -50,11 +49,19 @@ enum error_memory {
 };
 
 
+typedef struct {
+
+    char name [AMOUNTLABELS][MAXNAMELABEL];
+    int size;
+
+} Label;
+
+
 unsigned int amountOfString (char * mem, unsigned long filesize);
-void converter (int * commandsArray, char ** getAdress, unsigned long amount_of_strings);  
+void converter (int * commandsArray, char ** getAdress, unsigned long amount_of_strings, Label * labels);
 bool createCommandsArray (int ** bufferNumberCommands, unsigned long amount_of_strings);
 unsigned long FileSize (FILE * file);
-void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * getAdress);
+void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * getAdress, Label * labels);
 unsigned int getBuffer (char ** mem_start, unsigned long filesize,\
                             unsigned long * amount_of_string, FILE * file);
 unsigned int InitializePointersArray (char *** getAdress, char * mem_start, unsigned long filesize,\
@@ -65,26 +72,32 @@ unsigned int skipSpaces (char * commandStr);
 
 int main (void) {
 
-	FILE * compFile = fopen ("compileFile.txt", "r");
-	CHECK_ERROR (compFile == NULL, "Problem with opening compileFile.txt", FILE_AREN_T_OPENING);
-	FILE * aftercompFile = fopen ("afterCompileFile.txt", "w");
-	CHECK_ERROR (aftercompFile == NULL, "Problem with opening afterCompileFile.txt", FILE_AREN_T_OPENING);
-	unsigned long filesize = FileSize (compFile), amount_of_strings = 0;
-	CHECK_ERROR (filesize == 0, "The compilefile is empty.", EMPTY_FILE);
+    FILE * compFile = fopen ("compileFile.txt", "r");
+    CHECK_ERROR (compFile == NULL, "Problem with opening compileFile.txt", FILE_AREN_T_OPENING);
+    FILE * aftercompFile = fopen ("afterCompileFile.txt", "w");
+    CHECK_ERROR (aftercompFile == NULL, "Problem with opening afterCompileFile.txt", FILE_AREN_T_OPENING);
+    unsigned long filesize = FileSize (compFile), amount_of_strings = 0;
+    CHECK_ERROR (filesize == 0, "The compilefile is empty.", EMPTY_FILE);
 
-	char * mem_start     = NULL, 
-         ** getAdress    = NULL;
-    int  * commandsArray = NULL;
+
+    char  * mem_start     = NULL, 
+          ** getAdress    = NULL;
+    int   * commandsArray = NULL;
+    Label labels          =   {.size = 0};
+
 
     CHECK_ERROR (createCommandsArray (&commandsArray, amount_of_strings) == false, "Problem with allocating memory.", MEMORY_NOT_FOUND);
     MAIN_DET (getBuffer (&mem_start, filesize, &amount_of_strings, compFile));
     InitializePointersArray (&getAdress, mem_start, filesize, amount_of_strings);
     pointerGetStr (mem_start, getAdress, filesize);
-    converter (commandsArray, getAdress, amount_of_strings);
+    converter (commandsArray, getAdress, amount_of_strings, &labels);
 
-    for (int i = 0; i < amount_of_strings * 2; i++)
-        printf ("%d ", commandsArray [i]);
+    //for (int i = 0; i < amount_of_strings * 2; i++)
+    //   printf ("%d ", commandsArray [i]);
     
+    for (int i = 0; i < AMOUNTLABELS; i++)
+        printf ("%s", labels.name [i]);
+
     return 0;
 }
 
@@ -110,7 +123,7 @@ unsigned int amountOfString (char * mem, unsigned long filesize) {
 }
 
 
-void converter (int * commandsArray, char ** getAdress, unsigned long amount_of_strings) {
+void converter (int * commandsArray, char ** getAdress, unsigned long amount_of_strings, Label * labels) {
 
     char capacityBuffer [MAXLENCOMMAND];
     int i = 0, val = 0, j = 0;
@@ -118,7 +131,7 @@ void converter (int * commandsArray, char ** getAdress, unsigned long amount_of_
     for (i = 0; i < amount_of_strings; i++) {
 
         sscanf (getAdress [i], "%s", capacityBuffer);
-        getAssemblerCommands (capacityBuffer, commandsArray, getAdress [i]);
+        getAssemblerCommands (capacityBuffer, commandsArray, getAdress [i], labels);
     }
 
 
@@ -148,11 +161,14 @@ unsigned int getBuffer (char ** mem_start, unsigned long filesize,\
 }
 
 
-void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * getAdress) {
+void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * getAdress, Label * labels) {
 
-    if (capacityBuffer [strlen (capacityBuffer) - 1] == ':') {
+    int lenNameLabel = strlen (capacityBuffer);
 
+    if (capacityBuffer [lenNameLabel - 1] == ':') {
 
+        strncpy (labels->name[labels->size], capacityBuffer, lenNameLabel - 1);
+        labels->size++;
         return;
     }
 
