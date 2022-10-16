@@ -104,8 +104,6 @@ int main (void) {
     for (int i = 0; i < amount_of_strings * 2; i++)
        printf ("%d ", commandsArray [i]);
 
-   /*
-
    printf ("\n\n");
     
     for (int i = 0; i < AMOUNTLABELS; i++) {
@@ -113,8 +111,6 @@ int main (void) {
         printf ("%s ", (labels->arrayLabels)[i].name);
         printf ("NUM STRING: %d\n", (labels->arrayLabels)[i].numberStringLabel);
     }
-
-*/
 
     decompilation (commandsArray, labels, fileDecompilation, 2 * amount_of_strings);
 
@@ -206,6 +202,13 @@ void decompilationCommand (int command, FILE * fileDecompilation, int * flagDual
 
     if ( * flagDualCommands == 2) {
 
+        fprintf (fileDecompilation, "(%d)\n", command);
+        * flagDualCommands = 0;
+        return;
+    }
+
+    if ( * flagDualCommands == 3) {
+
         fprintf (fileDecompilation, "%d\n", command);
         * flagDualCommands = 0;
         return;
@@ -218,10 +221,16 @@ void decompilationCommand (int command, FILE * fileDecompilation, int * flagDual
         return;
     }
 
+    if (command == IN) {
+
+        fprintf (fileDecompilation, "in ");
+        * flagDualCommands = 2;
+    }
+
     if (command == JMP) {
 
         fprintf (fileDecompilation, "jmp ");
-        * flagDualCommands = 2;
+        * flagDualCommands = 3;
         return;
     }
 }
