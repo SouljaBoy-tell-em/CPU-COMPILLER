@@ -63,7 +63,7 @@ typedef struct {
 
 
 unsigned int amountOfString (char * mem, unsigned long filesize);
-void converter (int * commandsArray, char ** getAdress, unsigned long amount_of_strings, Label * labels);
+void compile (int * commandsArray, char ** getAdress, unsigned long amount_of_strings, Label * labels);
 bool createCommandsArray (int ** bufferNumberCommands, unsigned long amount_of_strings, Label ** labels);
 void decompilation (int * commandsArray, Label * labels, FILE * fileDecompilation, unsigned long sizeCommandsArray);
 void decompilationCommand (int command, FILE * fileDecompilation, int * flagDualCommands);
@@ -98,21 +98,40 @@ int main (void) {
     MAIN_DET (getBuffer (&mem_start, filesize, &amount_of_strings, compFile));
     InitializePointersArray (&getAdress, mem_start, filesize, amount_of_strings);
     pointerGetStr (mem_start, getAdress, filesize);
-    converter (commandsArray, getAdress, amount_of_strings, labels);
+    compile (commandsArray, getAdress, amount_of_strings, labels);
+    decompilation (commandsArray, labels, fileDecompilation, 2 * amount_of_strings);
 
+    /*
 
     for (int i = 0; i < amount_of_strings * 2; i++)
        printf ("%d ", commandsArray [i]);
+    printf ("\n\n");
 
-   printf ("\n\n");
+    */
+
+    /*
     
     for (int i = 0; i < AMOUNTLABELS; i++) {
 
         printf ("%s ", (labels->arrayLabels)[i].name);
         printf ("NUM STRING: %d\n", (labels->arrayLabels)[i].numberStringLabel);
     }
+    
+    */
 
-    decompilation (commandsArray, labels, fileDecompilation, 2 * amount_of_strings);
+
+
+
+    FILE * binaryFile = fopen ("binaryFile.bin", "wb");
+    CHECK_ERROR (binaryFile == NULL, "Problem with opening binaryFile.txt", FILE_AREN_T_OPENING);
+    fwrite (commandsArray, sizeof (int), 2 * amount_of_strings, binaryFile);
+    fclose (binaryFile);
+    FILE * binaryFile1 = fopen ("binaryFile.bin", "rb");
+    int array [2 * amount_of_strings];
+    fread (array, sizeof (int), 2 * amount_of_strings, binaryFile1);
+    for (int i = 0; i < 2 * amount_of_strings; i++)
+        printf ("%d ", array [i]);
+
 
     return 0;
 }
@@ -141,7 +160,7 @@ bool createCommandsArray (int ** bufferNumberCommands, unsigned long amount_of_s
 }
 
 
-void converter (int * commandsArray, char ** getAdress, unsigned long amount_of_strings, Label * labels) {
+void compile (int * commandsArray, char ** getAdress, unsigned long amount_of_strings, Label * labels) {
 
     char capacityBuffer [MAXLENCOMMAND];
     int numString = 0, val = 0, j = 0;
