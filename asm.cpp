@@ -127,10 +127,9 @@ int main (void) {
     fwrite (commandsArray, sizeof (int), 2 * amount_of_strings, binaryFile);
     fclose (binaryFile);
     FILE * binaryFile1 = fopen ("binaryFile.bin", "rb");
-    int array [2 * amount_of_strings];
-    fread (array, sizeof (int), 2 * amount_of_strings, binaryFile1);
+    fread (commandsArray, sizeof (int), 2 * amount_of_strings, binaryFile1);
     for (int i = 0; i < 2 * amount_of_strings; i++)
-        printf ("%d ", array [i]);
+        printf ("%02x ", commandsArray [i]);
 
 
     return 0;
