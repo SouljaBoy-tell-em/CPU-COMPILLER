@@ -6,6 +6,8 @@
 
 #define MAXLENCOMMAND 50
 #define AMOUNTLABELS 30
+#define SIGNATURE 0xDEDDED32
+#define VERSION 1
 
 
 #define CHECK_ERROR(condition, message_error, error_code) \
@@ -149,9 +151,11 @@ unsigned int amountOfString (char * mem, unsigned long filesize) {
 
 bool createCommandsArray (int ** bufferNumberCommands, unsigned long amount_of_strings, Label ** labels) {
 
-    * bufferNumberCommands = (int * ) calloc (2 * amount_of_strings, sizeof (int));
+    * bufferNumberCommands = (int * ) calloc (2 * amount_of_strings + 2, sizeof (int));
     * labels = (Label * ) calloc (1, sizeof (Label));
-    ( * labels)->ip = 0;
+    ** bufferNumberCommands = SIGNATURE;
+    * ( * bufferNumberCommands + 1) = VERSION;
+    ( * labels)->ip = 2;
     
     if (bufferNumberCommands == NULL)
         return false;
@@ -176,7 +180,7 @@ void decompilation (int * commandsArray, Label * labels, FILE * fileDecompilatio
 
     int flagDualCommands = 0;
     int i = 0;
-    for (i = 0; i < sizeCommandsArray; i++)
+    for (i = 2; i < sizeCommandsArray; i++) 
         decompilationCommand (commandsArray [i], fileDecompilation, &flagDualCommands);
 }
 
@@ -305,7 +309,7 @@ void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * ge
     }
 
     int val = 0;
-    static int j = 0;
+    static int j = 2;
 
     if (!strcmp ("push", capacityBuffer)   ) {
 
