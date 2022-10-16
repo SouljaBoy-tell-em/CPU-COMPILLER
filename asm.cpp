@@ -66,7 +66,7 @@ unsigned int amountOfString (char * mem, unsigned long filesize);
 void converter (int * commandsArray, char ** getAdress, unsigned long amount_of_strings, Label * labels);
 bool createCommandsArray (int ** bufferNumberCommands, unsigned long amount_of_strings, Label ** labels);
 void decompilation (int * commandsArray, Label * labels, FILE * fileDecompilation, unsigned long sizeCommandsArray);
-void decompilationCommand (int command, FILE * fileDecompilation, bool * flagDualCommands);
+void decompilationCommand (int command, FILE * fileDecompilation, int * flagDualCommands);
 int detect2ndLabel (char * getAdress, Label * labels);
 unsigned long FileSize (FILE * file);
 void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * getAdress, Label * labels, int numString);
@@ -160,18 +160,18 @@ void converter (int * commandsArray, char ** getAdress, unsigned long amount_of_
 
 void decompilation (int * commandsArray, Label * labels, FILE * fileDecompilation, unsigned long sizeCommandsArray) {
 
-    bool flagDualCommands = false;
+    int flagDualCommands = 0;
     int i = 0;
     for (i = 0; i < sizeCommandsArray; i++)
         decompilationCommand (commandsArray [i], fileDecompilation, &flagDualCommands);
 }
 
 
-void decompilationCommand (int command, FILE * fileDecompilation, bool * flagDualCommands) {
+void decompilationCommand (int command, FILE * fileDecompilation, int * flagDualCommands) {
 
     //--------------SIMPLE COMMANDS--------------//
 
-    if ( * flagDualCommands == false) {
+    if ( * flagDualCommands == 0) {
 
         if (command == ADD)
             fprintf (fileDecompilation, "add\n" );
@@ -197,17 +197,32 @@ void decompilationCommand (int command, FILE * fileDecompilation, bool * flagDua
 
     //-------------------------------------------//
 
-    else {
+    if ( * flagDualCommands == 1) {
 
         fprintf (fileDecompilation, "%d\n", command);
-        * flagDualCommands = false;
+        * flagDualCommands = 0;
+        return;
+    }
+
+    if ( * flagDualCommands == 2) {
+
+        fprintf (fileDecompilation, "%d\n", command);
+        * flagDualCommands = 0;
         return;
     }
 
     if (command == PUSH) {
 
         fprintf (fileDecompilation, "push ");
-        * flagDualCommands = true;
+        * flagDualCommands = 1;
+        return;
+    }
+
+    if (command == JMP) {
+
+        fprintf (fileDecompilation, "jmp ");
+        * flagDualCommands = 2;
+        return;
     }
 }
 
