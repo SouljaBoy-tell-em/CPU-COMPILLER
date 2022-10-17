@@ -2,12 +2,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <ctype.h>
 
 
 #define MAXLENCOMMAND 50
+#define LENREGISTER 5
 #define AMOUNTLABELS 30
+#define AMOUNTREGISTERS 15
 #define SIGNATURE 0xDEDDED32
 #define VERSION 1
+#define POISON -228
 
 
 #define CHECK_ERROR(condition, message_error, error_code) \
@@ -36,7 +40,8 @@ enum commands {
     JMP,
     DUMP,
     OUT,
-    HLT
+    HLT,
+    POP
 };
 
 /*----------------------------------*/
@@ -64,21 +69,31 @@ typedef struct {
 } Label;
 
 
+typedef struct {
+
+    char name [LENREGISTER];
+    int equationRegister;
+} Register;
+
+
 unsigned int amountOfString (char * mem, unsigned long filesize);
-void compile (int * commandsArray, char ** getAdress, unsigned long amount_of_strings, Label * labels);
+void compile (int * commandsArray, char ** getAdress, unsigned long amount_of_strings, Label * labels, Register * registers);
 bool createCommandsArray (int ** bufferNumberCommands, unsigned long amount_of_strings, Label ** labels);
+bool createRegisters (Register * registers);
 void decompilation (int * commandsArray, Label * labels, FILE * fileDecompilation, unsigned long sizeCommandsArray);
 void decompilationCommand (int command, FILE * fileDecompilation, int * flagDualCommands);
 int detect2ndLabel (char * getAdress, Label * labels);
+int exploreRegister (char * arg, Register * registers);
 unsigned long FileSize (FILE * file);
-void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * getAdress, Label * labels, int numString);
+void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * getAdress, Label * labels, int numString, Register * registers);
 unsigned int getBuffer (char ** mem_start, unsigned long filesize,\
                             unsigned long * amount_of_string, FILE * file);
+unsigned int get2ndArg (char * getAdress, Register * registers);
 unsigned int InitializePointersArray (char *** getAdress, char * mem_start, unsigned long filesize,\
                               unsigned long amount_of_string);
+unsigned int InitializeStructRegistersArray (Register ** registers);
 void pointerGetStr (char * buffer, char ** getAdress, unsigned long filesize);
 void recordInBuffer (char * mem_start);
-unsigned int skipSpaces (char * commandStr);
 
 int main (void) {
 
@@ -90,17 +105,20 @@ int main (void) {
     CHECK_ERROR (filesize == 0, "The compilefile is empty.", EMPTY_FILE);
 
 
-    char  *  mem_start     = NULL, 
-          ** getAdress     = NULL;
-    int   *  commandsArray = NULL;
-    Label *  labels        = NULL;
+    char     *  mem_start     = NULL, 
+             ** getAdress     = NULL;
+    int      *  commandsArray = NULL;
+    Label    *  labels        = NULL;
+    Register * registers      = NULL;
 
-
-    CHECK_ERROR (createCommandsArray (&commandsArray, amount_of_strings, &labels) == false, "Problem with allocating memory.", MEMORY_NOT_FOUND);
+    CHECK_ERROR (createCommandsArray (&commandsArray, amount_of_strings, &labels) == false, "Problem with allocating memory for commandsArray", MEMORY_NOT_FOUND);
     MAIN_DET (getBuffer (&mem_start, filesize, &amount_of_strings, compFile));
     InitializePointersArray (&getAdress, mem_start, filesize, amount_of_strings);
+    InitializeStructRegistersArray (&registers);
+    registers [0].equationRegister = 11;
+    registers [1].equationRegister = -2;
     pointerGetStr (mem_start, getAdress, filesize);
-    compile (commandsArray, getAdress, amount_of_strings, labels);
+    compile (commandsArray, getAdress, amount_of_strings, labels, registers);
     decompilation (commandsArray, labels, fileDecompilation, 2 * amount_of_strings);
 
     /*
@@ -132,6 +150,14 @@ int main (void) {
     fread (commandsArray, sizeof (int), 2 * amount_of_strings, binaryFile1);
     for (int i = 0; i < 2 * amount_of_strings; i++)
         printf ("%02x ", commandsArray [i]);
+    printf ("\n\n\n");
+
+    createRegisters (registers);
+    for (int i = 0; i < AMOUNTREGISTERS; i++){
+
+        printf ("REGISTER:  %s\n", registers[i].name);
+        printf ("EQUATION: %d\n", registers[i].equationRegister);
+    }
 
 
     return 0;
@@ -163,7 +189,23 @@ bool createCommandsArray (int ** bufferNumberCommands, unsigned long amount_of_s
 }
 
 
-void compile (int * commandsArray, char ** getAdress, unsigned long amount_of_strings, Label * labels) {
+bool createRegisters (Register * registers) {
+
+    char startRegister [LENREGISTER] = "rax";
+
+    int i = 0;
+    for (i = 0; i < AMOUNTREGISTERS; i++) {
+
+        strcpy ((registers + i)->name, startRegister);
+        (registers + i)->equationRegister = POISON;
+        startRegister [1]++;
+    }
+    
+    return true;
+}
+
+
+void compile (int * commandsArray, char ** getAdress, unsigned long amount_of_strings, Label * labels, Register * registers) {
 
     char capacityBuffer [MAXLENCOMMAND];
     int numString = 0, val = 0, j = 0;
@@ -171,7 +213,7 @@ void compile (int * commandsArray, char ** getAdress, unsigned long amount_of_st
     for (numString = 0; numString < amount_of_strings; numString++) {
 
         sscanf (getAdress [numString], "%s", capacityBuffer);
-        getAssemblerCommands (capacityBuffer, commandsArray, getAdress [numString], labels, numString);
+        getAssemblerCommands (capacityBuffer, commandsArray, getAdress [numString], labels, numString, registers);
     }
 }
 
@@ -255,6 +297,11 @@ void decompilationCommand (int command, FILE * fileDecompilation, int * flagDual
         * flagDualCommands = 3;
         return;
     }
+
+    if (command == POP) {
+
+        fprintf (fileDecompilation, "pop ");
+    }
 }
 
 
@@ -273,6 +320,26 @@ int detect2ndLabel (char * getAdress, Label * labels) {
 }
 
 
+int exploreRegister (char * arg, Register * registers) {
+
+    if ( * arg != 'r' || * (arg + 2) != 'x')
+        return POISON;
+
+    char secondLetterStartRegister = 'a';
+
+    int i = 0;
+    for (i = 0; i < AMOUNTREGISTERS; i++) {
+
+        if ( * (arg + 1) == secondLetterStartRegister)
+            return registers[i].equationRegister;
+
+        secondLetterStartRegister++;
+    }
+
+    return POISON;
+}   
+
+
 unsigned long FileSize (FILE * compfile) {
 
     struct stat buf = {};
@@ -283,20 +350,7 @@ unsigned long FileSize (FILE * compfile) {
 }
 
 
-unsigned int getBuffer (char ** mem_start, unsigned long filesize,\
-                            unsigned long * amount_of_string, FILE * file) {
-
-    * mem_start = (char * ) calloc (filesize, sizeof (char));
-    CHECK_ERROR (* mem_start == NULL, "Memory not allocated for mem_start.", MEMORY_NOT_FOUND);
-    fread (* mem_start, sizeof (char), filesize, file);
-    recordInBuffer (* mem_start);
-    * amount_of_string = amountOfString (* mem_start, filesize);
-
-    return NO_ERROR;
-}
-
-
-void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * getAdress, Label * labels, int numString) {
+void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * getAdress, Label * labels, int numString, Register * registers) {
 
     int lenNameLabel = strlen (capacityBuffer);
 
@@ -314,7 +368,7 @@ void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * ge
     if (!strcmp ("push", capacityBuffer)   ) {
 
         commandsArray [j] =   PUSH;    j++;
-        val =       skipSpaces (getAdress);
+        val =        get2ndArg (getAdress, registers);
         commandsArray [j] = val;       j++;
     }
 
@@ -370,6 +424,44 @@ void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * ge
         commandsArray [j] =  HLT;      j++;
     }
 
+    if (!strcmp ("pop", capacityBuffer)    ) {
+
+        commandsArray [j] =  POP;      j++;
+    }
+
+}
+
+
+unsigned int getBuffer (char ** mem_start, unsigned long filesize,\
+                            unsigned long * amount_of_string, FILE * file) {
+
+    * mem_start = (char * ) calloc (filesize, sizeof (char));
+    CHECK_ERROR (* mem_start == NULL, "Memory not allocated for mem_start.", MEMORY_NOT_FOUND);
+    fread (* mem_start, sizeof (char), filesize, file);
+    recordInBuffer (* mem_start);
+    * amount_of_string = amountOfString (* mem_start, filesize);
+
+    return NO_ERROR;
+}
+
+
+unsigned int get2ndArg (char * getAdress, Register * registers) {
+
+    char arg [MAXLENCOMMAND];
+    int lenStr = 0, val = 0;
+
+    sscanf (getAdress, "%s%n", arg, &lenStr);
+    while (isspace ( * (getAdress + lenStr)))
+        lenStr++;
+
+    if (sscanf (getAdress + lenStr, "%d", &val))
+        return val;
+
+    else {
+
+        sscanf (getAdress, "%s %s", arg, arg);
+        return exploreRegister (arg, registers);
+    }
 }
 
 
@@ -379,6 +471,15 @@ unsigned int InitializePointersArray (char *** getAdress, char * mem_start, unsi
     * getAdress = (char ** )calloc (amount_of_string, sizeof (char * ));
     CHECK_ERROR (* getAdress == NULL, "Memory not allocated for getAdress.", MEMORY_NOT_FOUND);
     pointerGetStr (mem_start, * getAdress, filesize);
+
+    return NO_ERROR;
+}
+
+
+unsigned int InitializeStructRegistersArray (Register ** registers) {
+
+    * registers = (Register * )calloc (AMOUNTREGISTERS, sizeof (Register));
+    CHECK_ERROR (* registers == NULL, "Memory not allocated for registers.", MEMORY_NOT_FOUND);
 
     return NO_ERROR;
 }
@@ -396,16 +497,6 @@ void pointerGetStr (char * buffer, char ** getAdress, unsigned long filesize) {
             j++;
         }
     }
-}
-
-
-unsigned int skipSpaces (char * getAdress) {
-
-    int val = 0, indexNumber = 0;
-    while (sscanf (getAdress + indexNumber, "%d", &val) != 1)
-        indexNumber++;
-
-    return val;
 }
 
 
