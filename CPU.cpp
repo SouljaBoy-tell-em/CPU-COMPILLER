@@ -113,7 +113,7 @@ int main (void) {
 
 void addingInStack (Stack * stack, int * commandsArray) {
 
-	int i = 0, commandFlag = 0;
+	int i = 0, commandFlag = 0, j = 0;
 	for (i = 2; i < AMOUNTCOMMANDS; i++) {
 
 		if (commandFlag == 0) {
@@ -129,7 +129,7 @@ void addingInStack (Stack * stack, int * commandsArray) {
 
 			if (commandsArray [i] == DIV)
 				StackPush (stack, StackPop (stack) / StackPop (stack));
-			
+
 		}
 
 		if (commandFlag == 1) {
@@ -142,8 +142,11 @@ void addingInStack (Stack * stack, int * commandsArray) {
 		if (commandsArray [i] == PUSH) {
 
 			commandFlag = 1;
-			continue;
 		}
+
+		if (commandsArray [i] == JMP)
+			i = commandsArray [i + 1] - 1;
+
 	}
 
 }
@@ -396,5 +399,3 @@ void UninititalizeElements (Stack * stack) {
 		* (Elem_t * ) (getStartData (stack) + sizeof (Elem_t) * i) = POISON;
 	StackError (stack);
 }
-
-
