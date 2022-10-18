@@ -41,7 +41,8 @@ enum commands {
     DUMP,
     OUT,
     HLT,
-    POP
+    POP,
+    JB // <
 };
 
 /*----------------------------------*/
@@ -77,6 +78,8 @@ typedef struct {
 
 
 unsigned int amountOfString (char * mem, unsigned long filesize);
+void closeMemoryPointers (FILE * compFile, FILE * fileDecompilation, FILE * binaryFile, char * mem_start,\
+                          char ** getAdress, int * commandsArray, Label * labels, Register * registers);
 void compile (int * commandsArray, char ** getAdress, unsigned long amount_of_strings, Label * labels, Register * registers);
 bool createCommandsArray (int ** bufferNumberCommands, unsigned long amount_of_strings, Label ** labels);
 bool createRegisters (Register * registers);
@@ -121,44 +124,10 @@ int main (void) {
     compile (commandsArray, getAdress, amount_of_strings, labels, registers);
     decompilation (commandsArray, labels, fileDecompilation, 2 * amount_of_strings);
 
-    /*
-
-    for (int i = 0; i < amount_of_strings * 2; i++)
-       printf ("%d ", commandsArray [i]);
-    printf ("\n\n");
-
-    */
-
-    /*
-    
-    for (int i = 0; i < AMOUNTLABELS; i++) {
-
-        printf ("%s ", (labels->arrayLabels)[i].name);
-        printf ("NUM STRING: %d\n", (labels->arrayLabels)[i].numberStringLabel);
-    }
-    
-    */
-
-
-
-
     FILE * binaryFile = fopen ("binaryFile.bin", "wb");
     CHECK_ERROR (binaryFile == NULL, "Problem with opening binaryFile.txt", FILE_AREN_T_OPENING);
     fwrite (commandsArray, sizeof (int), 2 * amount_of_strings, binaryFile);
-    fclose (binaryFile);
-    FILE * binaryFile1 = fopen ("binaryFile.bin", "rb");
-    fread (commandsArray, sizeof (int), 2 * amount_of_strings, binaryFile1);
-    for (int i = 0; i < 2 * amount_of_strings; i++)
-        printf ("%02x ", commandsArray [i]);
-    printf ("\n\n\n");
-
     createRegisters (registers);
-    for (int i = 0; i < AMOUNTREGISTERS; i++){
-
-        printf ("REGISTER:  %s\n", registers[i].name);
-        printf ("EQUATION: %d\n", registers[i].equationRegister);
-    }
-
 
     return 0;
 }
@@ -172,6 +141,20 @@ unsigned int amountOfString (char * mem, unsigned long filesize) {
             amount++;
 
     return amount + 1;
+}
+
+
+void closeMemoryPointers (FILE * compFile, FILE * fileDecompilation, FILE * binaryFile, char * mem_start,\
+                          char ** getAdress, int * commandsArray, Label * labels, Register * registers) {
+
+    fclose (compFile);
+    fclose (fileDecompilation);
+    fclose (binaryFile);
+    free (mem_start);
+    free (getAdress);
+    free (commandsArray);
+    free (labels);
+    free (registers);
 }
 
 
@@ -220,18 +203,18 @@ void compile (int * commandsArray, char ** getAdress, unsigned long amount_of_st
 
 void decompilation (int * commandsArray, Label * labels, FILE * fileDecompilation, unsigned long sizeCommandsArray) {
 
-    int flagDualCommands = 0;
+    int flagCommands = 0;
     int i = 0;
     for (i = 2; i < sizeCommandsArray; i++) 
-        decompilationCommand (commandsArray [i], fileDecompilation, &flagDualCommands);
+        decompilationCommand (commandsArray [i], fileDecompilation, &flagCommands);
 }
 
 
-void decompilationCommand (int command, FILE * fileDecompilation, int * flagDualCommands) {
+void decompilationCommand (int command, FILE * fileDecompilation, int * flagCommands) {
 
     //--------------SIMPLE COMMANDS--------------//
 
-    if ( * flagDualCommands == 0) {
+    if ( * flagCommands == 0) {
 
         if (command == ADD)
             fprintf (fileDecompilation, "add\n" );
@@ -257,44 +240,44 @@ void decompilationCommand (int command, FILE * fileDecompilation, int * flagDual
 
     //-------------------------------------------//
 
-    if ( * flagDualCommands == 1) {
+    if ( * flagCommands == 1) {
 
         fprintf (fileDecompilation, "%d\n", command);
-        * flagDualCommands = 0;
+        * flagCommands = 0;
         return;
     }
 
-    if ( * flagDualCommands == 2) {
+    if ( * flagCommands == 2) {
 
         fprintf (fileDecompilation, "(%d)\n", command);
-        * flagDualCommands = 0;
+        * flagCommands = 0;
         return;
     }
 
-    if ( * flagDualCommands == 3) {
+    if ( * flagCommands == 3) {
 
         fprintf (fileDecompilation, "%d\n", command);
-        * flagDualCommands = 0;
+        * flagCommands = 0;
         return;
     }
 
     if (command == PUSH) {
 
         fprintf (fileDecompilation, "push ");
-        * flagDualCommands = 1;
+        * flagCommands = 1;
         return;
     }
 
     if (command == IN) {
 
         fprintf (fileDecompilation, "in ");
-        * flagDualCommands = 2;
+        * flagCommands = 2;
     }
 
     if (command == JMP) {
 
         fprintf (fileDecompilation, "jmp ");
-        * flagDualCommands = 3;
+        * flagCommands = 3;
         return;
     }
 
@@ -352,18 +335,16 @@ unsigned long FileSize (FILE * compfile) {
 
 void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * getAdress, Label * labels, int numString, Register * registers) {
 
-    int lenNameLabel = strlen (capacityBuffer);
+    int lenNameLabel = strlen (capacityBuffer), val = 0;
+    static int j = 2;
 
     if (capacityBuffer [lenNameLabel - 1] == ':') {
 
         strncpy ((labels->arrayLabels[labels->ip]).name, capacityBuffer, lenNameLabel - 1);
-        labels->arrayLabels[labels->ip].numberStringLabel = numString;
+        labels->arrayLabels[labels->ip].numberStringLabel = j;
         labels->ip++;
         return;
     }
-
-    int val = 0;
-    static int j = 2;
 
     if (!strcmp ("push", capacityBuffer)   ) {
 
@@ -429,6 +410,16 @@ void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * ge
         commandsArray [j] =  POP;      j++;
     }
 
+
+
+    //------------JUMP FUNCTION--------------//
+
+    if (!strcmp ("jb", capacityBuffer)     ) {
+
+        commandsArray [j] = JB;        j++;
+        val = detect2ndLabel (getAdress, labels);
+        commandsArray [j] = val;       j++;
+    }
 }
 
 
