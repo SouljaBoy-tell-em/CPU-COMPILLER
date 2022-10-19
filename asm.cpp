@@ -1,10 +1,16 @@
 #include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <ctype.h>
 
 
+#define MASKIMMED 1 << 29
+#define TURNOFFMASKIMMED ~(1 << 29)
+#define MASKREGISTER 1 << 30
+#define TURNOFFMASKREGISTER ~(1 << 30)
+#define MASK
 #define MAXLENCOMMAND 50
 #define LENREGISTER 5
 #define AMOUNTLABELS 30
@@ -52,7 +58,8 @@ enum error_memory {
     NO_ERROR,
     FILE_AREN_T_OPENING,
     MEMORY_NOT_FOUND,
-    EMPTY_FILE
+    EMPTY_FILE,
+    BAD_EQUATION
 };
 
 
@@ -83,15 +90,15 @@ void closeMemoryPointers (FILE * compFile, FILE * fileDecompilation, FILE * bina
 void compile (int * commandsArray, char ** getAdress, unsigned long amount_of_strings, Label * labels, Register * registers);
 bool createCommandsArray (int ** bufferNumberCommands, unsigned long amount_of_strings, Label ** labels);
 bool createRegisters (Register * registers);
-void decompilation (int * commandsArray, Label * labels, FILE * fileDecompilation, unsigned long sizeCommandsArray);
-void decompilationCommand (int command, FILE * fileDecompilation, int * flagDualCommands);
+void decompilation (int * commandsArray, Label * labels, FILE * fileDecompilation, unsigned long sizeCommandsArray, Register * registers);
+void decompilationCommand (int command, FILE * fileDecompilation, int * flagDualCommands, Register * registers);
 int detect2ndLabel (char * getAdress, Label * labels);
 int exploreRegister (char * arg, Register * registers);
 unsigned long FileSize (FILE * file);
 void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * getAdress, Label * labels, int numString, Register * registers);
 unsigned int getBuffer (char ** mem_start, unsigned long filesize,\
                             unsigned long * amount_of_string, FILE * file);
-unsigned int get2ndArg (char * getAdress, Register * registers);
+unsigned int get2ndArg (char * getAdress, Register * registers, int * commandArray);
 unsigned int InitializePointersArray (char *** getAdress, char * mem_start, unsigned long filesize,\
                               unsigned long amount_of_string);
 unsigned int InitializeStructRegistersArray (Register ** registers);
@@ -118,16 +125,23 @@ int main (void) {
     MAIN_DET (getBuffer (&mem_start, filesize, &amount_of_strings, compFile));
     InitializePointersArray (&getAdress, mem_start, filesize, amount_of_strings);
     InitializeStructRegistersArray (&registers);
+    createRegisters (registers);
     registers [0].equationRegister = 11;
     registers [1].equationRegister = -2;
     pointerGetStr (mem_start, getAdress, filesize);
     compile (commandsArray, getAdress, amount_of_strings, labels, registers);
-    decompilation (commandsArray, labels, fileDecompilation, 2 * amount_of_strings);
+    decompilation (commandsArray, labels, fileDecompilation, 2 * amount_of_strings, registers);
 
     FILE * binaryFile = fopen ("binaryFile.bin", "wb");
     CHECK_ERROR (binaryFile == NULL, "Problem with opening binaryFile.txt", FILE_AREN_T_OPENING);
     fwrite (commandsArray, sizeof (int), 2 * amount_of_strings, binaryFile);
-    createRegisters (registers);
+    fclose (binaryFile);
+    FILE * binaryFile1 = fopen ("binaryFile.bin", "rb");
+    fread (commandsArray, sizeof (int), 2 * amount_of_strings, binaryFile1);
+
+    for (int i = 0; i < 2 * amount_of_strings; i++)
+        printf ("%d ", commandsArray [i]);
+    printf ("\n\n");
 
     return 0;
 }
@@ -201,16 +215,16 @@ void compile (int * commandsArray, char ** getAdress, unsigned long amount_of_st
 }
 
 
-void decompilation (int * commandsArray, Label * labels, FILE * fileDecompilation, unsigned long sizeCommandsArray) {
+void decompilation (int * commandsArray, Label * labels, FILE * fileDecompilation, unsigned long sizeCommandsArray, Register * registers) {
 
     int flagCommands = 0;
     int i = 0;
     for (i = 2; i < sizeCommandsArray; i++) 
-        decompilationCommand (commandsArray [i], fileDecompilation, &flagCommands);
+        decompilationCommand (commandsArray [i], fileDecompilation, &flagCommands, registers);
 }
 
 
-void decompilationCommand (int command, FILE * fileDecompilation, int * flagCommands) {
+void decompilationCommand (int command, FILE * fileDecompilation, int * flagCommands, Register * registers) {
 
     //--------------SIMPLE COMMANDS--------------//
 
@@ -240,9 +254,16 @@ void decompilationCommand (int command, FILE * fileDecompilation, int * flagComm
 
     //-------------------------------------------//
 
-    if ( * flagCommands == 1) {
+    if ( * flagCommands == MASKIMMED) {
 
         fprintf (fileDecompilation, "%d\n", command);
+        * flagCommands = 0;
+        return;
+    }
+
+    if ( * flagCommands == MASKREGISTER) {
+
+        fprintf (fileDecompilation, "%s\n", (registers + command)->name);
         * flagCommands = 0;
         return;
     }
@@ -261,10 +282,17 @@ void decompilationCommand (int command, FILE * fileDecompilation, int * flagComm
         return;
     }
 
-    if (command == PUSH) {
+    if ((command & TURNOFFMASKIMMED) == PUSH) {
 
         fprintf (fileDecompilation, "push ");
-        * flagCommands = 1;
+        * flagCommands = MASKIMMED;
+        return;
+    }
+
+    if ((command & TURNOFFMASKREGISTER) == PUSH) {
+
+        fprintf (fileDecompilation, "push ");
+        * flagCommands = MASKREGISTER;
         return;
     }
 
@@ -279,11 +307,6 @@ void decompilationCommand (int command, FILE * fileDecompilation, int * flagComm
         fprintf (fileDecompilation, "jmp ");
         * flagCommands = 3;
         return;
-    }
-
-    if (command == POP) {
-
-        fprintf (fileDecompilation, "pop ");
     }
 }
 
@@ -306,7 +329,7 @@ int detect2ndLabel (char * getAdress, Label * labels) {
 int exploreRegister (char * arg, Register * registers) {
 
     if ( * arg != 'r' || * (arg + 2) != 'x')
-        return POISON;
+        return -1;
 
     char secondLetterStartRegister = 'a';
 
@@ -314,12 +337,12 @@ int exploreRegister (char * arg, Register * registers) {
     for (i = 0; i < AMOUNTREGISTERS; i++) {
 
         if ( * (arg + 1) == secondLetterStartRegister)
-            return registers[i].equationRegister;
+            return i;
 
         secondLetterStartRegister++;
     }
 
-    return POISON;
+    return -1;
 }   
 
 
@@ -348,9 +371,9 @@ void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * ge
 
     if (!strcmp ("push", capacityBuffer)   ) {
 
-        commandsArray [j] =   PUSH;    j++;
-        val =        get2ndArg (getAdress, registers);
-        commandsArray [j] = val;       j++;
+        commandsArray [j] =   PUSH;
+        val =        get2ndArg (getAdress, registers, &commandsArray [j]);
+        j++; commandsArray [j] = val;  j++;
     }
 
     if (!strcmp ("add", capacityBuffer)    ) {
@@ -436,7 +459,7 @@ unsigned int getBuffer (char ** mem_start, unsigned long filesize,\
 }
 
 
-unsigned int get2ndArg (char * getAdress, Register * registers) {
+unsigned int get2ndArg (char * getAdress, Register * registers, int * commandArray) {
 
     char arg [MAXLENCOMMAND];
     int lenStr = 0, val = 0;
@@ -445,14 +468,23 @@ unsigned int get2ndArg (char * getAdress, Register * registers) {
     while (isspace ( * (getAdress + lenStr)))
         lenStr++;
 
-    if (sscanf (getAdress + lenStr, "%d", &val))
+    if (sscanf (getAdress + lenStr, "%d", &val)) {
+
+        * commandArray = ( * commandArray) | MASKIMMED;
         return val;
+    }
 
     else {
 
         sscanf (getAdress, "%s %s", arg, arg);
-        return exploreRegister (arg, registers);
+        if ((val = exploreRegister (arg, registers)) >= 0) {
+
+            * commandArray = ( * commandArray) | MASKREGISTER;
+            return val;
+        }
     }
+
+    return BAD_EQUATION;
 }
 
 
