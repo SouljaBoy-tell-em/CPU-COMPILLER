@@ -5,6 +5,12 @@
 #include <limits.h>
 
 
+#define MASKIMMED 1 << 29
+#define TURNOFFMASKIMMED ~(1 << 29)
+#define MASKREGISTER 1 << 30
+#define TURNOFFMASKREGISTER ~(1 << 30)
+#define AMOUNTREGISTERS 15
+#define LENREGISTER 5
 #define AMOUNTCOMMANDS 20
 #define MAXLENCOMMAND 50
 #define MAXLEN 512
@@ -37,7 +43,13 @@ typedef struct {
 	long long hash_stack;
 	Elem_t hash_data;
 	long long finishStructCanary;
-} Stack;	 
+} Stack;
+
+typedef struct {
+
+    char name [LENREGISTER];
+    int equationRegister;
+} Register;
 
 
 enum errors {
@@ -73,8 +85,10 @@ enum commands {
 
 
 void addingInStack (Stack * stack, int * commandsArray);
+bool createRegisters (Register * registers);
 void dumpFileCleaning (void);
 void errorsDecoder (Stack * stack, FILE * dump);
+int exploreRegister (char * arg, Register * registers);
 unsigned int fullCodeError (Stack * stack);
 uint8_t * getStartData (Stack * stack);
 unsigned int hashFunction (Stack * stack);
@@ -100,10 +114,6 @@ int main (void) {
 	FILE * binaryFile = fopen ("binaryFile.bin", "rb");
 	int commandsArray [MAXLENCOMMAND];
     fread (commandsArray, sizeof (int), AMOUNTCOMMANDS, binaryFile);
-
-    for (int i = 0; i < AMOUNTCOMMANDS; i++)
-    	printf ("%d ", commandsArray [i]);
-    printf ("\n\n");
 
     addingInStack (&stack, commandsArray);
 
@@ -136,19 +146,26 @@ void addingInStack (Stack * stack, int * commandsArray) {
 
 			StackPush (stack, commandsArray [i]);
 			commandFlag = 0;
-			continue;
 		}
 
-		if (commandsArray [i] == PUSH) {
-
+		if ((commandsArray [i] & TURNOFFMASKIMMED) == PUSH)
 			commandFlag = 1;
-		}
-
-		if (commandsArray [i] == JMP)
-			i = commandsArray [i + 1] - 1;
-
 	}
+}
 
+bool createRegisters (Register * registers) {
+
+    char startRegister [LENREGISTER] = "rax";
+
+    int i = 0;
+    for (i = 0; i < AMOUNTREGISTERS; i++) {
+
+        strcpy ((registers + i)->name, startRegister);
+        (registers + i)->equationRegister = POISON;
+        startRegister [1]++;
+    }
+    
+    return true;
 }
 
 
@@ -188,6 +205,26 @@ void errorsDecoder (Stack * stack, FILE * dump) {
 		if (stack->code_of_error & STACK_NULL)
 			fprintf (dump, "Bad pointer on the stack.\n");
 }
+
+
+int exploreRegister (char * arg, Register * registers) {
+
+    if ( * arg != 'r' || * (arg + 2) != 'x')
+        return POISON;
+
+    char secondLetterStartRegister = 'a';
+
+    int i = 0;
+    for (i = 0; i < AMOUNTREGISTERS; i++) {
+
+        if ( * (arg + 1) == secondLetterStartRegister)
+            return registers[i].equationRegister;
+
+        secondLetterStartRegister++;
+    }
+
+    return POISON;
+}   
 
 
 unsigned int fullCodeError (Stack * stack) {
