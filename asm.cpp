@@ -10,7 +10,6 @@
 #define TURNOFFMASKIMMED ~(1 << 29)
 #define MASKREGISTER 1 << 30
 #define TURNOFFMASKREGISTER ~(1 << 30)
-#define MASK
 #define MAXLENCOMMAND 50
 #define LENREGISTER 5
 #define AMOUNTLABELS 30
@@ -80,7 +79,6 @@ typedef struct {
 typedef struct {
 
     char name [LENREGISTER];
-    int equationRegister;
 } Register;
 
 
@@ -126,8 +124,6 @@ int main (void) {
     InitializePointersArray (&getAdress, mem_start, filesize, amount_of_strings);
     InitializeStructRegistersArray (&registers);
     createRegisters (registers);
-    registers [0].equationRegister = 11;
-    registers [1].equationRegister = -2;
     pointerGetStr (mem_start, getAdress, filesize);
     compile (commandsArray, getAdress, amount_of_strings, labels, registers);
     decompilation (commandsArray, labels, fileDecompilation, 2 * amount_of_strings, registers);
@@ -136,12 +132,17 @@ int main (void) {
     CHECK_ERROR (binaryFile == NULL, "Problem with opening binaryFile.txt", FILE_AREN_T_OPENING);
     fwrite (commandsArray, sizeof (int), 2 * amount_of_strings, binaryFile);
     fclose (binaryFile);
+
+/*
+
     FILE * binaryFile1 = fopen ("binaryFile.bin", "rb");
     fread (commandsArray, sizeof (int), 2 * amount_of_strings, binaryFile1);
 
     for (int i = 0; i < 2 * amount_of_strings; i++)
         printf ("%d ", commandsArray [i]);
     printf ("\n\n");
+
+*/
 
     return 0;
 }
@@ -194,7 +195,6 @@ bool createRegisters (Register * registers) {
     for (i = 0; i < AMOUNTREGISTERS; i++) {
 
         strcpy ((registers + i)->name, startRegister);
-        (registers + i)->equationRegister = POISON;
         startRegister [1]++;
     }
     
