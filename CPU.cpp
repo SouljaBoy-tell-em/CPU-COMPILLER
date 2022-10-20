@@ -15,7 +15,6 @@
 #define MAXLENCOMMAND 50
 #define MAXLEN 512
 #define CANARY 0xDEDDED32
-#define HASH_COEFFICIENT 0xDEADF00D
 #define RATIO_SIZE_STACK 2
 #define DETERMINERROR 000000001
 #define POISON -228
@@ -52,6 +51,15 @@ typedef struct {
 } Register;
 
 
+enum error_memory {
+
+    FILE_AREN_T_OPENING = 1,
+    MEMORY_NOT_FOUND,
+    EMPTY_FILE,
+    BAD_EQUATION
+};
+
+
 enum errors {
 
 	NO_ERROR = 0,
@@ -84,14 +92,14 @@ enum commands {
 };
 
 
-void addingInStack (Stack * stack, int * commandsArray);
+void addingInStack (Stack * stack, int * commandsArray, Register * registers);
 bool createRegisters (Register * registers);
 void dumpFileCleaning (void);
 void errorsDecoder (Stack * stack, FILE * dump);
 int exploreRegister (char * arg, Register * registers);
 unsigned int fullCodeError (Stack * stack);
 uint8_t * getStartData (Stack * stack);
-unsigned int hashFunction (Stack * stack);
+unsigned int InitializeStructRegistersArray (Register ** registers);
 void StackClear (Stack * stack);
 void StackCtor (Stack * stack, int capacity);
 void StackDump (Stack * stack, int lineStackDump, const char * nameFunctionDump, const char * fileFunctionDump);
@@ -115,13 +123,22 @@ int main (void) {
 	int commandsArray [MAXLENCOMMAND];
     fread (commandsArray, sizeof (int), AMOUNTCOMMANDS, binaryFile);
 
-    addingInStack (&stack, commandsArray);
+/*
+    for (int i = 0; i < AMOUNTCOMMANDS; i++)
+    	printf ("%d ", commandsArray [i]);
+*/
+
+    Register * registers = NULL;
+    InitializeStructRegistersArray (&registers);
+    createRegisters (registers);
+
+    addingInStack (&stack, commandsArray, registers);
 
 	return 0;
 }
 
 
-void addingInStack (Stack * stack, int * commandsArray) {
+void addingInStack (Stack * stack, int * commandsArray, Register * registers) {
 
 	int i = 0, commandFlag = 0, j = 0;
 	for (i = 2; i < AMOUNTCOMMANDS; i++) {
@@ -148,8 +165,18 @@ void addingInStack (Stack * stack, int * commandsArray) {
 			commandFlag = 0;
 		}
 
+		if (commandFlag == 2) {
+
+			StackPush (stack, (registers + commandsArray [i])->equationRegister);
+			commandFlag = 0;
+		}
+
 		if ((commandsArray [i] & TURNOFFMASKIMMED) == PUSH)
 			commandFlag = 1;
+
+		if ((commandsArray [i] & TURNOFFMASKREGISTER) == PUSH) 
+			commandFlag = 2;
+
 	}
 }
 
@@ -266,30 +293,13 @@ uint8_t * getStartData (Stack * stack) {
 }
 
 
-unsigned int hashFunction (Stack * stack) {
+unsigned int InitializeStructRegistersArray (Register ** registers) {
 
-	uint8_t * data = (uint8_t * ) stack;
-	unsigned int len = stack->size * sizeof (Elem_t), save = 0, hash = 0;
+    * registers = (Register * )calloc (AMOUNTREGISTERS, sizeof (Register));
+    if (registers == NULL)
+    	return MEMORY_NOT_FOUND;
 
-	while (len > 4) {
-
-		save =                         * data;
-		save = save |  (( * (data + 1)) << 8);
-		save = save | (( * (data + 2)) << 16);
-		save = save | (( * (data + 3)) << 24);
-		save =        save * HASH_COEFFICIENT;
-		save =            save ^ (save >> 24);
-		save =        save * HASH_COEFFICIENT;
-		hash *=              HASH_COEFFICIENT;
-		hash ^=                          save;
-		data +=                             4;
-		len  -=                             4;
-	}
-
-	if (hash > UINT_MAX)
-		hash = UINT_MAX - hash;
-
-	return hash;
+    return NO_ERROR;
 }
 
 
@@ -335,7 +345,6 @@ void StackDump (Stack * stack, int lineStackDump, const char * nameFunctionDump,
 				"\n", stack, STATUS (stack->code_of_error),lineStackDump, nameFunctionDump, fileFunctionDump);
 	fprintf (dump, "CODE OF ERRORS: %d. ERRORS:\n", stack->code_of_error);
 
-	stack->hash_stack = hashFunction (stack);
 	if (stack->code_of_error) errorsDecoder (stack, dump);
 	StackInfoDump (stack, dump);
 	fclose (dump);
@@ -353,8 +362,6 @@ void StackInfoDump (Stack * stack, FILE * dump) {
 
 	fprintf (dump, "\nINFO:                     \n"                                     );
 	fprintf (dump, "STACK NAME:             %s  \n",       stack->name                  );
-	fprintf (dump, "STACK_HASH:             %lld\n",       stack->hash_stack            );
-	//fprintf (dump, "DATA_HASH:              %lf \n",       stack->hash_data             );
 	fprintf (dump, "START STRUCT CANARY:    %llx\n",       stack->startStructCanary     );
 	fprintf (dump, "FINISH STRUCT CANARY:   %llx\n",       stack->finishStructCanary    );
 	fprintf (dump, "START ELEM_T * CANARY:  %llx\n",       * (long long * )(stack->data));
