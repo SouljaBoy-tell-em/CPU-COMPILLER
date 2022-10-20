@@ -47,7 +47,12 @@ enum commands {
     OUT,
     HLT,
     POP,
-    JB // <
+    JB,
+    JBE,
+    JA,
+    JAE,
+    JE,
+    JNE
 };
 
 /*----------------------------------*/
@@ -250,6 +255,9 @@ void decompilationCommand (int command, FILE * fileDecompilation, int * flagComm
 
         if (command == HLT)
             fprintf (fileDecompilation, "hlt\n" );
+
+        if (command == POP)
+            fprintf (fileDecompilation, "pop\n" );
     }
 
     //-------------------------------------------//
@@ -306,7 +314,42 @@ void decompilationCommand (int command, FILE * fileDecompilation, int * flagComm
 
         fprintf (fileDecompilation, "jmp ");
         * flagCommands = 3;
-        return;
+    }
+
+    if (command == JB) {
+
+        fprintf (fileDecompilation, "jb ");
+        * flagCommands = 3;
+    }
+
+    if (command == JBE) {
+
+        fprintf (fileDecompilation, "jbe ");
+        * flagCommands = 3;
+    }
+
+    if (command == JA) {
+
+        fprintf (fileDecompilation, "ja ");
+        * flagCommands = 3;
+    }
+
+    if (command == JAE) {
+
+        fprintf (fileDecompilation, "jae ");
+        * flagCommands = 3;
+    }
+
+    if (command == JE) {
+
+        fprintf (fileDecompilation, "je ");
+        * flagCommands = 3;
+    }
+
+    if (command == JNE) {
+
+        fprintf (fileDecompilation, "jne ");
+        * flagCommands = 3;
     }
 }
 
@@ -443,6 +486,44 @@ void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * ge
         val = detect2ndLabel (getAdress, labels);
         commandsArray [j] = val;       j++;
     }
+
+    if (!strcmp ("jbe", capacityBuffer)    ) {
+
+        commandsArray [j] = JBE;       j++;
+        val = detect2ndLabel (getAdress, labels);
+        commandsArray [j] = val;       j++;
+    }
+
+    if (!strcmp ("ja", capacityBuffer)    ) {
+
+        commandsArray [j] = JA;        j++;
+        val = detect2ndLabel (getAdress, labels);
+        commandsArray [j] = val;       j++;
+    }
+
+    if (!strcmp ("jae", capacityBuffer)    ) {
+
+        commandsArray [j] = JAE;       j++;
+        val = detect2ndLabel (getAdress, labels);
+        commandsArray [j] = val;       j++;
+    }
+
+    if (!strcmp ("je", capacityBuffer)    ) {
+
+        commandsArray [j] = JE;        j++;
+        val = detect2ndLabel (getAdress, labels);
+        commandsArray [j] = val;       j++;
+    }
+
+    if (!strcmp ("jne", capacityBuffer)    ) {
+
+        commandsArray [j] = JNE;       j++;
+        val = detect2ndLabel (getAdress, labels);
+        commandsArray [j] = val;       j++;
+    }
+
+    //---------------------------------------//
+
 }
 
 
