@@ -9,7 +9,7 @@
 #define TURNOFFMASKIMMED ~(1 << 29)
 #define MASKREGISTER 1 << 30
 #define TURNOFFMASKREGISTER ~(1 << 30)
-#define AMOUNTREGISTERS 15
+#define AMOUNTREGISTERS 25
 #define LENREGISTER 5
 #define AMOUNTCOMMANDS 20
 #define MAXLENCOMMAND 50
@@ -117,7 +117,7 @@ int main (void) {
 	Stack stack = {};
 	STACKNAME (stack.name, stack);
 	dumpFileCleaning ();
-	StackCtor (&stack, AMOUNTCOMMANDS);
+	StackCtor (&stack, 40);
 
 	FILE * binaryFile = fopen ("binaryFile.bin", "rb");
 	int commandsArray [MAXLENCOMMAND];
@@ -131,7 +131,6 @@ int main (void) {
     Register * registers = NULL;
     InitializeStructRegistersArray (&registers);
     createRegisters (registers);
-
     addingInStack (&stack, commandsArray, registers);
 
 	return 0;
@@ -140,8 +139,10 @@ int main (void) {
 
 void addingInStack (Stack * stack, int * commandsArray, Register * registers) {
 
-	int i = 0, commandFlag = 0, j = 0;
+	int i = 0, commandFlag = 0, j = 0, saveVal1 = 0, saveVal2 = 0, counter = 0;
 	for (i = 2; i < AMOUNTCOMMANDS; i++) {
+
+		printf ("val: %d\n", commandsArray [i]);
 
 		if (commandFlag == 0) {
 
@@ -163,22 +164,56 @@ void addingInStack (Stack * stack, int * commandsArray, Register * registers) {
 
 			StackPush (stack, commandsArray [i]);
 			commandFlag = 0;
+			continue;
 		}
 
 		if (commandFlag == 2) {
 
-			StackPush (stack, (registers + commandsArray [i])->equationRegister);
+			StackPush (stack, (registers + i)->equationRegister);
 			commandFlag = 0;
+			continue;
 		}
 
 		if ((commandsArray [i] & TURNOFFMASKIMMED) == PUSH)
 			commandFlag = 1;
 
-		if ((commandsArray [i] & TURNOFFMASKREGISTER) == PUSH) 
+		if ((commandsArray [i] & TURNOFFMASKREGISTER) == PUSH)
 			commandFlag = 2;
 
+		if (commandsArray [i] == JB) {
+
+			registers->equationRegister = StackPop (stack);
+			(registers + 1)->equationRegister = StackPop (stack) + counter;
+			
+			if ((registers + 1)->equationRegister < registers->equationRegister) {
+
+				i = commandsArray [i + 1] - 1;
+				counter++;
+				continue;
+			}
+			i++;
+		}
 	}
 }
+
+/*
+
+bool theEndJB (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i) {
+
+	registers->equationRegister = StackPop (stack);
+	(registers + 1)->equationRegister = StackPop (stack) + ( * upEquationElement);
+
+	if ((registers + 1)->equationRegister < registers->equationRegister) {
+
+		* i = commandsArray [( * i) + 1] - 1;
+		( * upEquationElement)++;
+		return false;
+	}
+
+	return true;
+}
+
+*/
 
 bool createRegisters (Register * registers) {
 
@@ -188,7 +223,7 @@ bool createRegisters (Register * registers) {
     for (i = 0; i < AMOUNTREGISTERS; i++) {
 
         strcpy ((registers + i)->name, startRegister);
-        (registers + i)->equationRegister = POISON;
+        (registers + i)->equationRegister = 0;
         startRegister [1]++;
     }
     
