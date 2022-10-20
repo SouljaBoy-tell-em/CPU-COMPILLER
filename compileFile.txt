@@ -1,9 +1,16 @@
-push 10
-push 228
-add
-push 1
-push 2
-add
-div
-out
+push 2014
+start:
+push 812
+push 5
+push 3
+jb :start
+push 2014
+push 2014
+push 2014
+yungTrappa:
+push 11111
+push 5
+push 3
+jbe :yungTrappa
+pop
 hlt
