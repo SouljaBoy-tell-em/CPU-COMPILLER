@@ -1,9 +1,14 @@
-push 10
-push 228
-add
-push 1
-push 2
-add
-div
-out
+push 2014
+push 812
+push 5
+push 3
+jb 4
+push 2014
+push 2014
+push 2014
+push 11111
+push 5
+push 3
+jbe 18
+pop
 hlt
