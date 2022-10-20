@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <limits.h>
+#include <sys/stat.h>
 
 
 #define MASKIMMED 1 << 29
@@ -10,8 +11,8 @@
 #define MASKREGISTER 1 << 30
 #define TURNOFFMASKREGISTER ~(1 << 30)
 #define AMOUNTREGISTERS 25
+#define AMOUNTCOMMANDS 100
 #define LENREGISTER 5
-#define AMOUNTCOMMANDS 20
 #define MAXLENCOMMAND 50
 #define MAXLEN 512
 #define CANARY 0xDEDDED32
@@ -88,7 +89,12 @@ enum commands {
     OUT,
     HLT,
     POP,
-    JB
+    JB,
+    JBE,
+    JA,
+    JAE,
+    JE,
+    JNE
 };
 
 
@@ -109,19 +115,25 @@ Elem_t StackPop (Stack * stack);
 void StackPush (Stack * stack, Elem_t addDataElement);
 void StackReSizeDown (Stack * stack);
 void StackReSizeUp (Stack * stack, Elem_t addDataElement);
+bool theEndJA (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i);
+bool theEndJAE (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i);
+bool theEndJB (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i);
+bool theEndJBE (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i);
+bool theEndJE (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i);
+bool theEndJNE (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i);
 void UninititalizeElements (Stack * stack);
 
 
 int main (void) {
 
-	Stack stack = {};
-	STACKNAME (stack.name, stack);
-	dumpFileCleaning ();
-	StackCtor (&stack, 40);
-
 	FILE * binaryFile = fopen ("binaryFile.bin", "rb");
 	int commandsArray [MAXLENCOMMAND];
     fread (commandsArray, sizeof (int), AMOUNTCOMMANDS, binaryFile);
+
+	Stack stack = {};
+	STACKNAME (stack.name, stack);
+	dumpFileCleaning ();
+	StackCtor (&stack, AMOUNTCOMMANDS);
 
 /*
     for (int i = 0; i < AMOUNTCOMMANDS; i++)
@@ -139,8 +151,8 @@ int main (void) {
 
 void addingInStack (Stack * stack, int * commandsArray, Register * registers) {
 
-	int i = 0, commandFlag = 0, j = 0, saveVal1 = 0, saveVal2 = 0, counter = 0;
-	for (i = 2; i < AMOUNTCOMMANDS; i++) {
+	int i = 0, commandFlag = 0, j = 0, saveVal1 = 0, saveVal2 = 0, upEquationElement = 0;
+	for (i = 2; i < 100; i++) {
 
 		printf ("val: %d\n", commandsArray [i]);
 
@@ -157,6 +169,12 @@ void addingInStack (Stack * stack, int * commandsArray, Register * registers) {
 
 			if (commandsArray [i] == DIV)
 				StackPush (stack, StackPop (stack) / StackPop (stack));
+
+			if (commandsArray [i] == POP)
+				StackPop (stack);
+
+			if (commandsArray [i] == HLT)
+				return;
 
 		}
 
@@ -182,38 +200,164 @@ void addingInStack (Stack * stack, int * commandsArray, Register * registers) {
 
 		if (commandsArray [i] == JB) {
 
-			registers->equationRegister = StackPop (stack);
-			(registers + 1)->equationRegister = StackPop (stack) + counter;
-			
-			if ((registers + 1)->equationRegister < registers->equationRegister) {
-
-				i = commandsArray [i + 1] - 1;
-				counter++;
+			if (!theEndJB (registers, stack, &upEquationElement, commandsArray, &i)) 
 				continue;
-			}
+			continue;
+		}
+
+		if (commandsArray [i] == JBE) {
+
+			if (!theEndJBE (registers, stack, &upEquationElement, commandsArray, &i)) 
+				continue;
+			continue;
+		}
+
+		if (commandsArray [i] == JA) {
+
+			if (!theEndJA (registers, stack, &upEquationElement, commandsArray, &i)) 
+				continue;
+			
 			i++;
+			continue;
+		}
+
+		if (commandsArray [i] == JAE) {
+
+			if (!theEndJAE (registers, stack, &upEquationElement, commandsArray, &i)) 
+				continue;
+			
+			i++;
+			continue;
+		}
+
+		if (commandsArray [i] == JE) {
+
+			if (!theEndJE (registers, stack, &upEquationElement, commandsArray, &i)) 
+				continue;
+			
+			i++;
+			continue;
+		}
+
+		if (commandsArray [i] == JNE) {
+
+			if (!theEndJNE (registers, stack, &upEquationElement, commandsArray, &i)) 
+				continue;
+			
+			i++;
+			continue;
 		}
 	}
 }
 
-/*
+
+bool theEndJA (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i) {
+
+	registers->equationRegister = StackPop (stack);
+
+	if (( * upEquationElement) < registers->equationRegister - 1) {
+
+		* i = commandsArray [( * i) + 1] - 1;
+		registers->equationRegister--;
+		return false;
+	}
+
+	* upEquationElement = 0;
+	( * i)++;
+
+	return true;
+}
+
+
+bool theEndJAE (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i) {
+
+	registers->equationRegister = StackPop (stack);
+
+	if (( * upEquationElement) < registers->equationRegister) {
+
+		* i = commandsArray [( * i) + 1] - 1;
+		registers->equationRegister--;
+		return false;
+	}
+
+	* upEquationElement = 0;
+	( * i)++;
+
+	return true;
+}
+
 
 bool theEndJB (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i) {
 
 	registers->equationRegister = StackPop (stack);
-	(registers + 1)->equationRegister = StackPop (stack) + ( * upEquationElement);
 
-	if ((registers + 1)->equationRegister < registers->equationRegister) {
+	if (( * upEquationElement) < registers->equationRegister - 1) {
 
 		* i = commandsArray [( * i) + 1] - 1;
 		( * upEquationElement)++;
 		return false;
 	}
 
+	* upEquationElement = 0;
+	( * i)++;
+
 	return true;
 }
 
-*/
+
+bool theEndJBE (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i) {
+
+	registers->equationRegister = StackPop (stack);
+
+	if (( * upEquationElement) < registers->equationRegister) {
+
+		* i = commandsArray [( * i) + 1] - 1;
+		( * upEquationElement)++;
+		return false;
+	}
+
+	* upEquationElement = 0;
+	( * i)++;
+
+	return true;
+}
+
+
+bool theEndJE (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i) {
+
+	registers->equationRegister = StackPop (stack);
+
+	if (( * upEquationElement) == registers->equationRegister - 1) {
+
+		* i = commandsArray [( * i) + 1] - 1;
+		( * upEquationElement)++;
+		return false;
+	}
+
+	* upEquationElement = 0;
+	( * i)++;
+
+	return true;
+}
+
+
+bool theEndJNE (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i) {
+
+	registers->equationRegister = StackPop (stack);
+
+	if (( * upEquationElement) != registers->equationRegister - 1) {
+
+		* i = commandsArray [( * i) + 1] - 1;
+		( * upEquationElement)++;
+		return false;
+	}
+
+	* upEquationElement = 0;
+	( * i)++;
+
+	return true;
+}
+
 
 bool createRegisters (Register * registers) {
 
@@ -416,15 +560,17 @@ void StackInfoDump (Stack * stack, FILE * dump) {
 Elem_t StackPop (Stack * stack) {
 
 	StackError (stack);
-
 	Elem_t save = * ((Elem_t * )(getStartData (stack) + (stack->size - 1) * sizeof (Elem_t)));
+
+/*
 
 	if (stack->capacity > 2 * stack->size)
 		StackReSizeDown (stack);
 
+*/
+
 	* ((Elem_t * )(getStartData (stack) + (stack->size - 1) * sizeof (Elem_t))) = POISON;
 	stack->size--;
-	
 	StackError (stack);
 
 	return save;
@@ -443,24 +589,11 @@ void StackPush (Stack * stack, Elem_t addDataElement) {
 }
 
 
-void StackReSizeDown (Stack * stack) {
-
-	StackError (stack);
-
-	UninititalizeElements (stack);
-	* (Elem_t * )(getStartData (stack) + (stack->size - 1) * sizeof (Elem_t)) = CANARY;
-	stack->capacity /= 2;
-
-	StackError (stack);
-}
-
-
 void StackReSizeUp (Stack * stack, Elem_t addDataElement) {
 
 	StackError (stack);
 
 	uint8_t * dataPointer = getStartData (stack);
-	* ((Elem_t * )(dataPointer + sizeof (Elem_t) * stack->capacity)) = addDataElement;
 	stack->data = (Elem_t * ) realloc (stack->data, sizeof (Elem_t) * RATIO_SIZE_STACK * stack->capacity + 2 * sizeof (long long));
 	stack->capacity =  RATIO_SIZE_STACK * stack->capacity;
 	* ((long long * )(dataPointer + sizeof (Elem_t) * stack->capacity)) = CANARY;
