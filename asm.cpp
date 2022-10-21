@@ -6,10 +6,12 @@
 #include <ctype.h>
 
 
-#define MASKIMMED 1 << 29
-#define TURNOFFMASKIMMED ~(1 << 29)
-#define MASKREGISTER 1 << 30
-#define TURNOFFMASKREGISTER ~(1 << 30)
+#define MASKIMMED 1 << 28
+#define TURNOFFMASKIMMED ~(1 << 28)
+#define MASKREGISTER 1 << 29
+#define TURNOFFMASKREGISTER ~(1 << 29)
+#define MASKRAM 1 << 30
+#define TURNOFFMASKRAM ~(1 << 30)
 #define MAXLENCOMMAND 50
 #define LENREGISTER 5
 #define AMOUNTLABELS 30
@@ -138,7 +140,7 @@ int main (void) {
     fwrite (commandsArray, sizeof (int), 2 * amount_of_strings, binaryFile);
     fclose (binaryFile);
 
-/*
+
 
     FILE * binaryFile1 = fopen ("binaryFile.bin", "rb");
     fread (commandsArray, sizeof (int), 2 * amount_of_strings, binaryFile1);
@@ -147,7 +149,6 @@ int main (void) {
         printf ("%d ", commandsArray [i]);
     printf ("\n\n");
 
-*/
 
     return 0;
 }
@@ -255,9 +256,6 @@ void decompilationCommand (int command, FILE * fileDecompilation, int * flagComm
 
         if (command == HLT)
             fprintf (fileDecompilation, "hlt\n" );
-
-        if (command == POP)
-            fprintf (fileDecompilation, "pop\n" );
     }
 
     //-------------------------------------------//
@@ -272,6 +270,20 @@ void decompilationCommand (int command, FILE * fileDecompilation, int * flagComm
     if ( * flagCommands == MASKREGISTER) {
 
         fprintf (fileDecompilation, "%s\n", (registers + command)->name);
+        * flagCommands = 0;
+        return;
+    }
+
+    if ( * flagCommands == 4) {
+
+        fprintf (fileDecompilation, "[%d]\n", command);
+        * flagCommands = 0;
+        return;
+    }
+
+    if ( * flagCommands == 5) {
+
+        fprintf (fileDecompilation, "[%s]\n", (registers + command)->name);
         * flagCommands = 0;
         return;
     }
@@ -303,6 +315,49 @@ void decompilationCommand (int command, FILE * fileDecompilation, int * flagComm
         * flagCommands = MASKREGISTER;
         return;
     }
+
+    if ((command & TURNOFFMASKRAM) == (MASKIMMED | PUSH) || (command & TURNOFFMASKRAM) == (MASKREGISTER | PUSH)) {
+
+        command = command & TURNOFFMASKRAM;
+
+        if ((command & TURNOFFMASKIMMED) == PUSH)
+            * flagCommands = 4;
+
+        if ((command & TURNOFFMASKREGISTER) == PUSH)
+            * flagCommands = 5;
+
+        fprintf (fileDecompilation, "push ");
+        return;
+    }
+
+    if ((command & TURNOFFMASKIMMED) == POP) {
+
+        fprintf (fileDecompilation, "pop ");
+        * flagCommands = MASKIMMED;
+        return;
+    }
+
+    if ((command & TURNOFFMASKREGISTER) == POP) {
+
+        fprintf (fileDecompilation, "pop ");
+        * flagCommands = MASKREGISTER;
+        return;
+    }
+
+    if ((command & TURNOFFMASKRAM) == (MASKIMMED | POP) || (command & TURNOFFMASKRAM) == (MASKREGISTER | POP)) {
+
+        command = command & TURNOFFMASKRAM;
+
+        if ((command & TURNOFFMASKIMMED) == POP)
+            * flagCommands = 4;
+
+        if ((command & TURNOFFMASKREGISTER) == POP)
+            * flagCommands = 5;
+
+        fprintf (fileDecompilation, "push ");
+        return;
+    }
+
 
     if (command == IN) {
 
@@ -415,8 +470,9 @@ void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * ge
     if (!strcmp ("push", capacityBuffer)   ) {
 
         commandsArray [j] =   PUSH;
-        val =        get2ndArg (getAdress, registers, &commandsArray [j]);
-        j++; commandsArray [j] = val;  j++;
+        val = get2ndArg (getAdress, registers, &commandsArray [j]);
+        j++; 
+        commandsArray [j] = val;  j++;
     }
 
     if (!strcmp ("add", capacityBuffer)    ) {
@@ -473,7 +529,11 @@ void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * ge
 
     if (!strcmp ("pop", capacityBuffer)    ) {
 
-        commandsArray [j] =  POP;      j++;
+        commandsArray [j] =  POP;
+        val = get2ndArg (getAdress, registers, &commandsArray [j]);
+        j++;
+        commandsArray [j] = val;
+        j++;
     }
 
 
@@ -549,20 +609,27 @@ unsigned int get2ndArg (char * getAdress, Register * registers, int * commandArr
     while (isspace ( * (getAdress + lenStr)))
         lenStr++;
 
-    if (sscanf (getAdress + lenStr, "%d", &val)) {
+
+    sscanf (getAdress + lenStr, "%s", arg);
+
+    if ( * arg == '[' && * (arg + strlen (arg) - 1) == ']') {
+
+        * (getAdress + lenStr) = * (getAdress + lenStr + strlen (arg) - 1) = ' ';
+        * commandArray = ( * commandArray) | MASKRAM;
+    }
+
+    if (sscanf (getAdress, "%s %d", arg, &val) == 2) {
 
         * commandArray = ( * commandArray) | MASKIMMED;
         return val;
-    }
+    } 
 
-    else {
+    if (sscanf (getAdress, "%s %s", arg, arg) == 2) {
 
-        sscanf (getAdress, "%s %s", arg, arg);
-        if ((val = exploreRegister (arg, registers)) >= 0) {
-
+        if ((val = exploreRegister (arg, registers)) >= 0)
             * commandArray = ( * commandArray) | MASKREGISTER;
-            return val;
-        }
+
+        return val;
     }
 
     return BAD_EQUATION;
