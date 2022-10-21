@@ -6,6 +6,8 @@
 #include <sys/stat.h>
 
 
+#define TURNOFFMASKPOP ~(1 << 27)
+#define MASKPOP 1 << 27
 #define INTRAMELEMENTS 400
 #define MASKIMMED 1 << 28
 #define TURNOFFMASKIMMED ~(1 << 28)
@@ -16,7 +18,7 @@
 #define TURNOFFMASKRAMANDIMMED (~(1 << 30)) ^ (~(1 << 28))
 #define TURNOFFMASKRAMANDREGISTER (~(1 << 30)) ^ (~(1 << 29))
 #define AMOUNTREGISTERS 25
-#define AMOUNTCOMMANDS 100
+#define AMOUNTCOMMANDS 75
 #define LENREGISTER 5
 #define MAXLENCOMMAND 50
 #define MAXLEN 512
@@ -155,7 +157,6 @@ int main (void) {
     (registers + 5)->equationRegister = 3;
     addingInStack (&stack, commandsArray, registers, memoryRAM);
 
-
 	return 0;
 }
 
@@ -163,7 +164,7 @@ int main (void) {
 void addingInStack (Stack * stack, int * commandsArray, Register * registers, int * ramElements) {
 
 	int i = 0, commandFlag = 0, j = 0, saveVal1 = 0, saveVal2 = 0, upEquationElement = 0;
-	for (i = 2; i < 100; i++) {
+	for (i = 2; i < AMOUNTCOMMANDS; i++) {
 
 		printf ("val: %d\n", commandsArray [i]);
 
@@ -177,6 +178,8 @@ void addingInStack (Stack * stack, int * commandsArray, Register * registers, in
 
 		if (detectPush (&commandFlag, commandsArray [i], registers, stack, ramElements))
 			continue;
+
+
 
 		if (commandsArray [i] == JBE) {
 
@@ -233,6 +236,27 @@ bool detectPush (int * commandFlag, int commandsArray, Register * registers, Sta
 			return true;
 		}
 
+		if ( * commandFlag == 5) {
+
+			(registers + commandsArray)->equationRegister = StackPop (stack);
+			* commandFlag = 0;
+			return true;
+		}
+
+		if ( * commandFlag == 6) {
+
+			ramElements [commandsArray] = StackPop (stack);
+			* commandFlag = 0;
+			return true;
+		}
+
+		if ( * commandFlag == 7) {
+
+			ramElements [(registers + commandsArray)->equationRegister] = StackPop (stack);
+			* commandFlag = 0;
+			return true;
+		}
+
 		if ((commandsArray & TURNOFFMASKIMMED) == PUSH) {
 
 			* commandFlag = 1;
@@ -245,17 +269,41 @@ bool detectPush (int * commandFlag, int commandsArray, Register * registers, Sta
 			return true;
 		}
 
-		if (((commandsArray & TURNOFFMASKRAM) & TURNOFFMASKIMMED) == PUSH){
+		if (((commandsArray & TURNOFFMASKRAM) & TURNOFFMASKIMMED) == PUSH) {
 
 			* commandFlag = 3;
 			return true;
 		}
 
-		if (((commandsArray & TURNOFFMASKRAM) & TURNOFFMASKREGISTER) == PUSH){
+		if (((commandsArray & TURNOFFMASKRAM) & TURNOFFMASKREGISTER) == PUSH) {
 
 			* commandFlag = 4;
 			return true;
 		}
+
+		if ((commandsArray & TURNOFFMASKPOP) == POP) {
+
+			StackPop (stack);
+			return true;
+		}
+
+		if ((commandsArray & TURNOFFMASKREGISTER) == POP) {
+
+			* commandFlag = 5;
+			return true;
+		}
+
+		if (((commandsArray & TURNOFFMASKRAM) & TURNOFFMASKIMMED) == POP) {
+
+			* commandFlag = 6;
+			return true;
+		}
+
+		if (((commandsArray & TURNOFFMASKRAM) & TURNOFFMASKIMMED) == POP) {
+
+			* commandFlag = 7;
+			return true;
+		}		
 
 	return false;
 }
@@ -342,7 +390,6 @@ bool theEndJBE (Register * registers, Stack * stack, int * upEquationElement, in
 
 		* i = commandsArray [( * i) + 1] - 1;
 		( * upEquationElement)++;
-		printf ("!!!");
 		return false;
 	}
 
