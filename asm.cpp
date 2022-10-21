@@ -6,6 +6,8 @@
 #include <ctype.h>
 
 
+#define TURNOFFMASKPOP ~(1 << 27)
+#define MASKPOP 1 << 27
 #define MASKIMMED 1 << 28
 #define TURNOFFMASKIMMED ~(1 << 28)
 #define MASKREGISTER 1 << 29
@@ -108,6 +110,7 @@ unsigned int InitializePointersArray (char *** getAdress, char * mem_start, unsi
                               unsigned long amount_of_string);
 unsigned int InitializeStructRegistersArray (Register ** registers);
 void pointerGetStr (char * buffer, char ** getAdress, unsigned long filesize);
+bool popEmptyArg (char * getAdress, int * commandsArray);
 void recordInBuffer (char * mem_start);
 
 int main (void) {
@@ -330,6 +333,12 @@ void decompilationCommand (int command, FILE * fileDecompilation, int * flagComm
         return;
     }
 
+    if ((command & TURNOFFMASKPOP) == POP) {
+
+        fprintf (fileDecompilation, "pop\n");
+        return;
+    }
+
     if ((command & TURNOFFMASKIMMED) == POP) {
 
         fprintf (fileDecompilation, "pop ");
@@ -354,7 +363,7 @@ void decompilationCommand (int command, FILE * fileDecompilation, int * flagComm
         if ((command & TURNOFFMASKREGISTER) == POP)
             * flagCommands = 5;
 
-        fprintf (fileDecompilation, "push ");
+        fprintf (fileDecompilation, "pop ");
         return;
     }
 
@@ -529,13 +538,21 @@ void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * ge
 
     if (!strcmp ("pop", capacityBuffer)    ) {
 
-        commandsArray [j] =  POP;
+        commandsArray [j] = POP;
+
+        if (!popEmptyArg (getAdress, &commandsArray[j])) {
+
+            j++;
+            commandsArray [j] = POISON;
+            j++;
+            return;
+        }
+        
         val = get2ndArg (getAdress, registers, &commandsArray [j]);
-        j++;
-        commandsArray [j] = val;
+        j++; 
+        commandsArray [j] = val;  
         j++;
     }
-
 
 
     //------------JUMP FUNCTION--------------//
@@ -668,6 +685,26 @@ void pointerGetStr (char * buffer, char ** getAdress, unsigned long filesize) {
             j++;
         }
     }
+}
+
+
+bool popEmptyArg (char * getAdress, int * commandsArray) {
+
+    char arg [MAXLENCOMMAND];
+    int lenStr = 0, val = 0;
+
+    sscanf (getAdress, "%s%n", arg, &lenStr);
+
+    while (isspace ( * (getAdress + lenStr)))
+        lenStr++;
+
+    if (lenStr == strlen (getAdress)) {
+
+        * commandsArray = ( * commandsArray) | MASKPOP;
+        return false;
+    }
+
+    return true;
 }
 
 
