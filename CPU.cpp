@@ -6,10 +6,15 @@
 #include <sys/stat.h>
 
 
-#define MASKIMMED 1 << 29
-#define TURNOFFMASKIMMED ~(1 << 29)
-#define MASKREGISTER 1 << 30
-#define TURNOFFMASKREGISTER ~(1 << 30)
+#define INTRAMELEMENTS 400
+#define MASKIMMED 1 << 28
+#define TURNOFFMASKIMMED ~(1 << 28)
+#define MASKREGISTER 1 << 29
+#define TURNOFFMASKREGISTER ~(1 << 29)
+#define MASKRAM 1 << 30
+#define TURNOFFMASKRAM ~(1 << 30)
+#define TURNOFFMASKRAMANDIMMED (~(1 << 30)) ^ (~(1 << 28))
+#define TURNOFFMASKRAMANDREGISTER (~(1 << 30)) ^ (~(1 << 29))
 #define AMOUNTREGISTERS 25
 #define AMOUNTCOMMANDS 100
 #define LENREGISTER 5
@@ -97,12 +102,14 @@ enum commands {
     JNE
 };
 
-
-void addingInStack (Stack * stack, int * commandsArray, Register * registers);
+void addingInStack (Stack * stack, int * commandsArray, Register * registers, int * ramElements);
+int createRAM (int ** ramElements);
 bool createRegisters (Register * registers);
+bool detectPush (int * commandFlag, int commandsArray, Register * registers, Stack * stack, int * ramElements);
 void dumpFileCleaning (void);
 void errorsDecoder (Stack * stack, FILE * dump);
 int exploreRegister (char * arg, Register * registers);
+void firstArgCommands (int commandsArray, Stack * stack);
 unsigned int fullCodeError (Stack * stack);
 uint8_t * getStartData (Stack * stack);
 unsigned int InitializeStructRegistersArray (Register ** registers);
@@ -135,21 +142,25 @@ int main (void) {
 	dumpFileCleaning ();
 	StackCtor (&stack, AMOUNTCOMMANDS);
 
-/*
-    for (int i = 0; i < AMOUNTCOMMANDS; i++)
-    	printf ("%d ", commandsArray [i]);
-*/
+	int * memoryRAM = NULL;
+	CHECK_ERROR (createRAM (&memoryRAM) > 0, "memoryRAM didn't allocated a free memory.");
+
+    //for (int i = 0; i < AMOUNTCOMMANDS; i++)
+    //	printf ("%d ", commandsArray [i]);
+    memoryRAM [3] = -1;
 
     Register * registers = NULL;
     InitializeStructRegistersArray (&registers);
     createRegisters (registers);
-    addingInStack (&stack, commandsArray, registers);
+    (registers + 5)->equationRegister = 3;
+    addingInStack (&stack, commandsArray, registers, memoryRAM);
+
 
 	return 0;
 }
 
 
-void addingInStack (Stack * stack, int * commandsArray, Register * registers) {
+void addingInStack (Stack * stack, int * commandsArray, Register * registers, int * ramElements) {
 
 	int i = 0, commandFlag = 0, j = 0, saveVal1 = 0, saveVal2 = 0, upEquationElement = 0;
 	for (i = 2; i < 100; i++) {
@@ -158,52 +169,14 @@ void addingInStack (Stack * stack, int * commandsArray, Register * registers) {
 
 		if (commandFlag == 0) {
 
-			if (commandsArray [i] == ADD)
-				StackPush (stack, StackPop (stack) + StackPop (stack));
-
-			if (commandsArray [i] == SUB)
-				StackPush (stack, StackPop (stack) - StackPop (stack));
-
-			if (commandsArray [i] == MUL) 
-				StackPush (stack, StackPop (stack) * StackPop (stack));
-
-			if (commandsArray [i] == DIV)
-				StackPush (stack, StackPop (stack) / StackPop (stack));
-
-			if (commandsArray [i] == POP)
-				StackPop (stack);
+			firstArgCommands (commandsArray [i], stack);
 
 			if (commandsArray [i] == HLT)
 				return;
-
 		}
 
-		if (commandFlag == 1) {
-
-			StackPush (stack, commandsArray [i]);
-			commandFlag = 0;
+		if (detectPush (&commandFlag, commandsArray [i], registers, stack, ramElements))
 			continue;
-		}
-
-		if (commandFlag == 2) {
-
-			StackPush (stack, (registers + i)->equationRegister);
-			commandFlag = 0;
-			continue;
-		}
-
-		if ((commandsArray [i] & TURNOFFMASKIMMED) == PUSH)
-			commandFlag = 1;
-
-		if ((commandsArray [i] & TURNOFFMASKREGISTER) == PUSH)
-			commandFlag = 2;
-
-		if (commandsArray [i] == JB) {
-
-			if (!theEndJB (registers, stack, &upEquationElement, commandsArray, &i)) 
-				continue;
-			continue;
-		}
 
 		if (commandsArray [i] == JBE) {
 
@@ -212,42 +185,98 @@ void addingInStack (Stack * stack, int * commandsArray, Register * registers) {
 			continue;
 		}
 
-		if (commandsArray [i] == JA) {
-
-			if (!theEndJA (registers, stack, &upEquationElement, commandsArray, &i)) 
-				continue;
-			
-			i++;
-			continue;
-		}
-
-		if (commandsArray [i] == JAE) {
-
-			if (!theEndJAE (registers, stack, &upEquationElement, commandsArray, &i)) 
-				continue;
-			
-			i++;
-			continue;
-		}
-
-		if (commandsArray [i] == JE) {
-
-			if (!theEndJE (registers, stack, &upEquationElement, commandsArray, &i)) 
-				continue;
-			
-			i++;
-			continue;
-		}
-
-		if (commandsArray [i] == JNE) {
-
-			if (!theEndJNE (registers, stack, &upEquationElement, commandsArray, &i)) 
-				continue;
-			
-			i++;
-			continue;
-		}
 	}
+}
+
+
+int createRAM (int ** ramElements) {
+
+	* ramElements = (int * ) calloc (INTRAMELEMENTS, sizeof (int));
+	if (ramElements == NULL)
+		return MEMORY_NOT_FOUND;
+
+	int i = 0;
+	for (i = 0; i < INTRAMELEMENTS; i++)
+		* ( * ramElements + i) = 0;
+
+	return NO_ERROR;
+}
+
+
+bool detectPush (int * commandFlag, int commandsArray, Register * registers, Stack * stack, int * ramElements) {
+
+	if ( * commandFlag == 1) {
+
+			StackPush (stack, commandsArray);
+			* commandFlag = 0;
+			return true;
+		}
+
+		if ( * commandFlag == 2) {
+
+			StackPush (stack, (registers + commandsArray)->equationRegister);
+			* commandFlag = 0;
+			return true;
+		}
+
+		if ( * commandFlag == 3) {
+
+			StackPush (stack, ramElements [commandsArray]);
+			* commandFlag = 0;
+			return true;
+		}
+
+		if ( * commandFlag == 4) {
+
+			StackPush (stack, ramElements [(registers + commandsArray)->equationRegister]);
+			* commandFlag = 0;
+			return true;
+		}
+
+		if ((commandsArray & TURNOFFMASKIMMED) == PUSH) {
+
+			* commandFlag = 1;
+			return true;
+		}
+
+		if ((commandsArray & TURNOFFMASKREGISTER) == PUSH) {
+
+			* commandFlag = 2;
+			return true;
+		}
+
+		if (((commandsArray & TURNOFFMASKRAM) & TURNOFFMASKIMMED) == PUSH){
+
+			* commandFlag = 3;
+			return true;
+		}
+
+		if (((commandsArray & TURNOFFMASKRAM) & TURNOFFMASKREGISTER) == PUSH){
+
+			* commandFlag = 4;
+			return true;
+		}
+
+	return false;
+}
+
+
+void firstArgCommands (int commandsArray, Stack * stack) {
+
+	if (commandsArray == ADD)
+		StackPush (stack, StackPop (stack) + StackPop (stack));
+
+	if (commandsArray == SUB)
+		StackPush (stack, StackPop (stack) - StackPop (stack));
+
+	if (commandsArray == MUL) 
+		StackPush (stack, StackPop (stack) * StackPop (stack));
+
+	if (commandsArray == DIV)
+		StackPush (stack, StackPop (stack) / StackPop (stack));
+
+	if (commandsArray == OUT)
+		printf ("pop-element: %d\n", StackPop (stack));
 }
 
 
@@ -291,7 +320,7 @@ bool theEndJB (Register * registers, Stack * stack, int * upEquationElement, int
 
 	registers->equationRegister = StackPop (stack);
 
-	if (( * upEquationElement) < registers->equationRegister - 1) {
+	if (( * upEquationElement) < registers->equationRegister) {
 
 		* i = commandsArray [( * i) + 1] - 1;
 		( * upEquationElement)++;
@@ -313,6 +342,7 @@ bool theEndJBE (Register * registers, Stack * stack, int * upEquationElement, in
 
 		* i = commandsArray [( * i) + 1] - 1;
 		( * upEquationElement)++;
+		printf ("!!!");
 		return false;
 	}
 
