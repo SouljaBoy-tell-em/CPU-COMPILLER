@@ -1,14 +1,10 @@
 push 2014
-push 812
-push 5
-push 3
-jb 4
-push 2014
 push 2014
 push 2014
 push 11111
-push 5
+push [rex]
 push 3
-jbe 18
-pop
+jbe 8
+push 222228
+push [3]
 hlt
