@@ -1,16 +1,11 @@
 push 2014
-start:
-push 812
-push 5
-push 3
-jb :start
-push 2014
 push 2014
 push 2014
 yungTrappa:
 push 11111
-push 5
+push [rex]
 push 3
 jbe :yungTrappa
-pop
+push 222228
+push [3]
 hlt
