@@ -101,7 +101,8 @@ enum commands {
     JA,
     JAE,
     JE,
-    JNE
+    JNE,
+    ENDL
 };
 
 int addingInStack (Stack * stack, int * commandsArray, Register * registers, int * ramElements, int amount_commands);
@@ -319,6 +320,9 @@ void firstArgCommands (int commandsArray, Stack * stack) {
 
 	if (commandsArray == DIV)
 		StackPush (stack, StackPop (stack) / StackPop (stack));
+
+	if (commandsArray == ENDL)
+		printf ("\n");
 
 	if (commandsArray == OUT)
 		printf ("%d", StackPop (stack));
