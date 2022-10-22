@@ -1,10 +1,27 @@
-push 2014
-push 2014
-push 2014
-push 11111
-push [rex]
-push 3
-jbe 8
-push 222228
-push [3]
+endl
+endl
+endl
+push 1
+pop rax
+push 1
+push rax
+add
+pop rbx
+push 1
+pop rax
+push 1
+push rax
+add
+pop rax
+push 1
+out
+push 5
+jbe 20
+endl
+push rbx
+pop rax
+push 5
+jbe 9
+endl
+endl
 hlt
