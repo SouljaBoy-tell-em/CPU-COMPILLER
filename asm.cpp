@@ -57,7 +57,8 @@ enum commands {
     JAE,
     JE,
     JNE,
-    ENDL
+    ENDL,
+    SPACE
 };
 
 /*----------------------------------*/
@@ -258,6 +259,9 @@ void decompilationCommand (int command, FILE * fileDecompilation, int * flagComm
 
         if (command == ENDL)
             fprintf (fileDecompilation, "endl\n");
+
+        if (command == SPACE)
+            fprintf (fileDecompilation, "space\n");
 
         if (command == OUT)
             fprintf (fileDecompilation, "out\n" );
@@ -562,6 +566,11 @@ void getAssemblerCommands (char * capacityBuffer, int * commandsArray, char * ge
     if (!strcmp ("endl", capacityBuffer)   ) {
 
         commandsArray [j] = ENDL;        j++;
+    }
+
+    if (!strcmp ("space", capacityBuffer)      ) {
+
+        commandsArray [j] = SPACE;       j++;
     }
 
 
