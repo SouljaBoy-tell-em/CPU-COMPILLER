@@ -148,10 +148,11 @@ int main (void) {
     FILE * binaryFile1 = fopen ("binaryFile.bin", "rb");
     fread (commandsArray, sizeof (int), 2 * amount_of_strings, binaryFile1);
 
+/*
     for (int i = 0; i < 2 * amount_of_strings; i++)
         printf ("%d ", commandsArray [i]);
     printf ("\n\n");
-
+*/
 
     return 0;
 }
