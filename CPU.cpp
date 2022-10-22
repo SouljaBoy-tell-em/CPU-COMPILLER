@@ -104,7 +104,7 @@ enum commands {
     JNE
 };
 
-void addingInStack (Stack * stack, int * commandsArray, Register * registers, int * ramElements);
+int addingInStack (Stack * stack, int * commandsArray, Register * registers, int * ramElements, int amount_commands);
 int createRAM (int ** ramElements);
 bool createRegisters (Register * registers);
 bool detectPush (int * commandFlag, int commandsArray, Register * registers, Stack * stack, int * ramElements);
@@ -112,8 +112,10 @@ void dumpFileCleaning (void);
 void errorsDecoder (Stack * stack, FILE * dump);
 int exploreRegister (char * arg, Register * registers);
 void firstArgCommands (int commandsArray, Stack * stack);
+unsigned long FileSize (FILE * compfile);
 unsigned int fullCodeError (Stack * stack);
 uint8_t * getStartData (Stack * stack);
+void InitializeCommamdsArray (int * commandsArray, int amount_commands);
 unsigned int InitializeStructRegistersArray (Register ** registers);
 void StackClear (Stack * stack);
 void StackCtor (Stack * stack, int capacity);
@@ -124,56 +126,49 @@ Elem_t StackPop (Stack * stack);
 void StackPush (Stack * stack, Elem_t addDataElement);
 void StackReSizeDown (Stack * stack);
 void StackReSizeUp (Stack * stack, Elem_t addDataElement);
-bool theEndJA (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i);
-bool theEndJAE (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i);
 bool theEndJB (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i);
 bool theEndJBE (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i);
-bool theEndJE (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i);
-bool theEndJNE (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i);
 void UninititalizeElements (Stack * stack);
 
 
 int main (void) {
 
 	FILE * binaryFile = fopen ("binaryFile.bin", "rb");
+	int amount_commands = FileSize (binaryFile) / sizeof (int);
 	int commandsArray [MAXLENCOMMAND];
-    fread (commandsArray, sizeof (int), AMOUNTCOMMANDS, binaryFile);
+	void InitializeCommamdsArray (int * commandsArray, int amount_commands);
+    fread (commandsArray, sizeof (int), amount_commands, binaryFile);
 
 	Stack stack = {};
 	STACKNAME (stack.name, stack);
 	dumpFileCleaning ();
-	StackCtor (&stack, AMOUNTCOMMANDS);
+	StackCtor (&stack, amount_commands);
 
 	int * memoryRAM = NULL;
 	CHECK_ERROR (createRAM (&memoryRAM) > 0, "memoryRAM didn't allocated a free memory.");
-
-    //for (int i = 0; i < AMOUNTCOMMANDS; i++)
-    //	printf ("%d ", commandsArray [i]);
     memoryRAM [3] = -1;
 
     Register * registers = NULL;
     InitializeStructRegistersArray (&registers);
     createRegisters (registers);
     (registers + 5)->equationRegister = 3;
-    addingInStack (&stack, commandsArray, registers, memoryRAM);
+    addingInStack (&stack, commandsArray, registers, memoryRAM, amount_commands);
 
 	return 0;
 }
 
 
-void addingInStack (Stack * stack, int * commandsArray, Register * registers, int * ramElements) {
+int addingInStack (Stack * stack, int * commandsArray, Register * registers, int * ramElements, int amount_commands) {
 
 	int i = 0, commandFlag = 0, j = 0, saveVal1 = 0, saveVal2 = 0, upEquationElement = 0;
-	for (i = 2; i < AMOUNTCOMMANDS; i++) {
-
-		printf ("val: %d\n", commandsArray [i]);
+	for (i = 2; i < amount_commands; i++) {
 
 		if (commandFlag == 0) {
 
 			firstArgCommands (commandsArray [i], stack);
 
 			if (commandsArray [i] == HLT)
-				return;
+				exit (0);
 		}
 
 		if (detectPush (&commandFlag, commandsArray [i], registers, stack, ramElements))
@@ -189,6 +184,8 @@ void addingInStack (Stack * stack, int * commandsArray, Register * registers, in
 		}
 
 	}
+
+	return 0;
 }
 
 
@@ -324,43 +321,17 @@ void firstArgCommands (int commandsArray, Stack * stack) {
 		StackPush (stack, StackPop (stack) / StackPop (stack));
 
 	if (commandsArray == OUT)
-		printf ("pop-element: %d\n", StackPop (stack));
+		printf ("%d", StackPop (stack));
 }
 
 
-bool theEndJA (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i) {
+unsigned long FileSize (FILE * compfile) {
 
-	registers->equationRegister = StackPop (stack);
+    struct stat buf = {};
+    if (fstat (fileno (compfile), &buf) == 0)
+        return buf.st_size;
 
-	if (( * upEquationElement) < registers->equationRegister - 1) {
-
-		* i = commandsArray [( * i) + 1] - 1;
-		registers->equationRegister--;
-		return false;
-	}
-
-	* upEquationElement = 0;
-	( * i)++;
-
-	return true;
-}
-
-
-bool theEndJAE (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i) {
-
-	registers->equationRegister = StackPop (stack);
-
-	if (( * upEquationElement) < registers->equationRegister) {
-
-		* i = commandsArray [( * i) + 1] - 1;
-		registers->equationRegister--;
-		return false;
-	}
-
-	* upEquationElement = 0;
-	( * i)++;
-
-	return true;
+    return 0;
 }
 
 
@@ -384,52 +355,11 @@ bool theEndJB (Register * registers, Stack * stack, int * upEquationElement, int
 
 bool theEndJBE (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i) {
 
-	registers->equationRegister = StackPop (stack);
-
-	if (( * upEquationElement) < registers->equationRegister) {
+	if (registers->equationRegister <= StackPop (stack)) {
 
 		* i = commandsArray [( * i) + 1] - 1;
-		( * upEquationElement)++;
 		return false;
 	}
-
-	* upEquationElement = 0;
-	( * i)++;
-
-	return true;
-}
-
-
-bool theEndJE (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i) {
-
-	registers->equationRegister = StackPop (stack);
-
-	if (( * upEquationElement) == registers->equationRegister - 1) {
-
-		* i = commandsArray [( * i) + 1] - 1;
-		( * upEquationElement)++;
-		return false;
-	}
-
-	* upEquationElement = 0;
-	( * i)++;
-
-	return true;
-}
-
-
-bool theEndJNE (Register * registers, Stack * stack, int * upEquationElement, int * commandsArray, int * i) {
-
-	registers->equationRegister = StackPop (stack);
-
-	if (( * upEquationElement) != registers->equationRegister - 1) {
-
-		* i = commandsArray [( * i) + 1] - 1;
-		( * upEquationElement)++;
-		return false;
-	}
-
-	* upEquationElement = 0;
 	( * i)++;
 
 	return true;
@@ -549,6 +479,14 @@ uint8_t * getStartData (Stack * stack) {
 }
 
 
+void InitializeCommamdsArray (int * commandsArray, int amount_commands) {
+
+	int i = 0;
+	for (i = 0; i < amount_commands; i++)
+		commandsArray [i] = 0;
+}
+
+
 unsigned int InitializeStructRegistersArray (Register ** registers) {
 
     * registers = (Register * )calloc (AMOUNTREGISTERS, sizeof (Register));
@@ -596,7 +534,7 @@ void StackCtor (Stack * stack, int capacity) {
 void StackDump (Stack * stack, int lineStackDump, const char * nameFunctionDump, const char * fileFunctionDump) {
 
 	FILE * dump = fopen ("dumpfile.txt", "w");
-	if (dump == NULL) exit (EXIT_FAILURE);
+	//if (dump == NULL) exit (EXIT_FAILURE);
 	fprintf (dump, "Stack [%p] (%s)\nStack called line %d in function %s at %s.\n"
 				"\n", stack, STATUS (stack->code_of_error),lineStackDump, nameFunctionDump, fileFunctionDump);
 	fprintf (dump, "CODE OF ERRORS: %d. ERRORS:\n", stack->code_of_error);
