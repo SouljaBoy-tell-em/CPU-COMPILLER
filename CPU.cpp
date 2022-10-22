@@ -102,7 +102,8 @@ enum commands {
     JAE,
     JE,
     JNE,
-    ENDL
+    ENDL,
+    SPACE
 };
 
 int addingInStack (Stack * stack, int * commandsArray, Register * registers, int * ramElements, int amount_commands);
@@ -323,6 +324,9 @@ void firstArgCommands (int commandsArray, Stack * stack) {
 
 	if (commandsArray == ENDL)
 		printf ("\n");
+
+	if (commandsArray == SPACE)
+		printf (" ");
 
 	if (commandsArray == OUT)
 		printf ("%d", StackPop (stack));
