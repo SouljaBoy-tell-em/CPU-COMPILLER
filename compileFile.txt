@@ -1,0 +1,16 @@
+push 1
+pop rax
+start1:
+	push 1
+	push rax
+	add
+	pop rax
+	push 2
+	pow 4
+	push 9
+	sqrt
+	push 5
+jbe :start1
+endl
+endl
+hlt
